@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>R4 四轴机械臂 · 交互式控制台</title>
+<style>
+  :root { --bg:#0e1116; --panel:#151a21; --line:#242c36; --txt:#d7dee8; --dim:#8b98a8;
+          --acc:#4ea1ff; --warn:#e0614a; --ok:#4fb477; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; background:var(--bg); color:var(--txt);
+              font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif; overflow:hidden; }
+  #app { display:flex; height:100%; }
+  #view { flex:1; position:relative; }
+  canvas { display:block; }
+  #hud { position:absolute; left:14px; top:12px; font-size:12px; line-height:1.7;
+         color:var(--dim); pointer-events:none; }
+  #hud b { color:var(--txt); font-weight:600; }
+  #panel { width:352px; background:var(--panel); border-left:1px solid var(--line);
+           overflow-y:auto; padding:14px 16px 40px; }
+  h1 { font-size:14px; margin:0 0 2px; letter-spacing:.4px; }
+  .sub { font-size:11px; color:var(--dim); margin-bottom:14px; }
+  h2 { font-size:11px; text-transform:uppercase; letter-spacing:1px; color:var(--dim);
+       margin:18px 0 8px; padding-bottom:5px; border-bottom:1px solid var(--line); }
+  .row { display:flex; align-items:center; gap:8px; margin:6px 0; font-size:12px; }
+  .row label { width:30px; color:var(--dim); flex:none; }
+  input[type=range] { flex:1; -webkit-appearance:none; height:3px; background:#2c3542;
+                      border-radius:2px; outline:none; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:13px; height:13px;
+                      border-radius:50%; background:var(--acc); cursor:pointer; }
+  .val { width:60px; text-align:right; font-variant-numeric:tabular-nums; font-size:11.5px; }
+  .bad .val { color:var(--warn); }
+  .nums { display:grid; grid-template-columns:1fr 1fr; gap:6px; font-size:11.5px; }
+  .nums div { background:#1a212a; border:1px solid var(--line); border-radius:4px;
+              padding:6px 8px; }
+  .nums span { color:var(--dim); display:block; font-size:10px; margin-bottom:2px; }
+  input[type=number] { background:#1a212a; border:1px solid var(--line); color:var(--txt);
+                       border-radius:3px; width:100%; padding:3px 5px; font-size:11.5px; }
+  .grid3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; margin:6px 0; }
+  .grid3 div span { color:var(--dim); font-size:10px; display:block; }
+  button { background:#1f2833; color:var(--txt); border:1px solid var(--line);
+           border-radius:4px; padding:5px 9px; font-size:11.5px; cursor:pointer; }
+  button:hover { background:#26313f; border-color:#36414f; }
+  button.primary { background:#1d4e7d; border-color:#2a6ba8; }
+  button.primary:hover { background:#245d95; }
+  .btns { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+  select { width:100%; background:#1a212a; color:var(--txt); border:1px solid var(--line);
+           border-radius:4px; padding:5px; font-size:12px; }
+  .msg { font-size:11.5px; min-height:16px; margin-top:6px; }
+  .msg.ok { color:var(--ok); } .msg.err { color:var(--warn); }
+  .hint { font-size:10.5px; color:var(--dim); line-height:1.6; margin-top:6px; }
+  kbd { background:#222b36; border:1px solid #303a47; border-radius:3px; padding:0 4px;
+        font-size:10px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="view"><div id="hud"></div></div>
+  <div id="panel">
+    <h1>R4 四轴机械臂 · 交互式控制台</h1>
+    <div class="sub">网格来自 <code>urdf/r4_urdf</code>，位姿由 FK 实时计算</div>
+
+    <h2>关节直接驱动</h2>
+    <div id="sliders"></div>
+    <div class="btns">
+      <button onclick="preset('zero')">零位</button>
+      <button onclick="preset('reach')">前伸</button>
+      <button onclick="preset('fold')">折叠</button>
+      <button onclick="preset('side')">侧摆</button>
+    </div>
+
+    <h2>逆解：输入末端目标</h2>
+    <div class="grid3">
+      <div><span>X (mm)</span><input type="number" id="tx" value="304" step="10"></div>
+      <div><span>Y (mm)</span><input type="number" id="ty" value="0" step="10"></div>
+      <div><span>Z (mm)</span><input type="number" id="tz" value="530" step="10"></div>
+    </div>
+    <div class="row" style="margin-top:6px">
+      <label>滚动</label>
+      <input type="range" id="roll" min="-180" max="180" step="1" value="0">
+      <span class="val" id="rollv">0°</span>
+    </div>
+    <div class="btns">
+      <button class="primary" onclick="runIK()">求解并过去</button>
+      <button onclick="runIK(true)">只求解</button>
+    </div>
+    <div class="msg" id="ikmsg"></div>
+
+    <h2>当前读数</h2>
+    <div class="nums" id="readout"></div>
+
+    <h2>控制算法回放</h2>
+    <select id="demo" onchange="loadDemo()"></select>
+    <div class="btns">
+      <button class="primary" id="playbtn" onclick="togglePlay()">▶ 播放</button>
+      <button onclick="stopDemo()">■ 停止</button>
+    </div>
+    <div class="row" style="margin-top:6px">
+      <label>t</label>
+      <input type="range" id="tbar" min="0" max="1000" value="0" oninput="scrub(this.value)">
+      <span class="val" id="tv">0.00s</span>
+    </div>
+    <div class="msg" id="demomsg"></div>
+
+    <div class="hint">
+      鼠标左键拖动=转视角，滚轮=缩放。<br>
+      <kbd>空格</kbd> 播放/暂停回放。<br>
+      逆解用闭式解（肘前/肘后 × 腰转 0/180° 四支候选），红色提示表示超出关节限位或工作空间。
+    </div>
+  </div>
+</div>
+
+<script src="three.min.js"></script>
+<script src="data.js"></script>
+<script>
+// ---------------------------------------------------------------- 场景
+const VIEW = document.getElementById('view');
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+VIEW.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#0e1116');
+
+const camera = new THREE.PerspectiveCamera(42, 1, 0.01, 200);
+camera.up.set(0, 0, 1);                       // 模型是 Z 向上（与 URDF 一致）
+const camState = { theta: -0.85, phi: 1.12, dist: 1.85, target: new THREE.Vector3(0.10, 0, 0.28) };
+function updateCam() {
+  const s = Math.sin(camState.phi), t = camState.theta;
+  camera.position.set(
+    camState.target.x + camState.dist * s * Math.cos(t),
+    camState.target.y + camState.dist * s * Math.sin(t),
+    camState.target.z + camState.dist * Math.cos(camState.phi));
+  camera.lookAt(camState.target);
+}
+
+scene.add(new THREE.HemisphereLight(0xdde8ff, 0x30363d, 0.85));
+const key = new THREE.DirectionalLight(0xffffff, 0.85);
+key.position.set(1.6, -1.4, 2.4); scene.add(key);
+const fill = new THREE.DirectionalLight(0xffffff, 0.35);
+fill.position.set(-2, 1.5, 0.8); scene.add(fill);
+
+const grid = new THREE.GridHelper(1.2, 24, 0x2a3441, 0x1b222b);
+grid.rotation.x = Math.PI / 2;               // GridHelper 默认躺在 XZ 面，转到 XY 面
+grid.position.z = -0.001; scene.add(grid);
+
+// ---------------------------------------------------------------- 按 URDF 语义搭层级
+const pivots = [];      // 关节 pivot
+const linkNames = CHAIN.links.map(l => l.name);
+
+function makeMesh(link) {
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(link.mesh.pos), 3));
+  g.setIndex(new THREE.BufferAttribute(new Uint32Array(link.mesh.idx), 1));
+  g.computeVertexNormals();
+  const m = new THREE.MeshLambertMaterial({ color: new THREE.Color(link.color) });
+  return new THREE.Mesh(g, m);
+}
+
+// base_link：在基座系
+const baseObj = new THREE.Object3D();
+baseObj.add(makeMesh(CHAIN.links[0]));
+scene.add(baseObj);
+
+let parent = baseObj;
+CHAIN.joints.forEach((j, i) => {
+  const p = new THREE.Object3D();
+  p.position.set(j.origin[0], j.origin[1], j.origin[2]);
+  parent.add(p);
+  p.add(makeMesh(CHAIN.links[i + 1]));
+  pivots.push(p);
+  parent = p;
+});
+
+// 末端点标记
+const tip = new THREE.Mesh(
+  new THREE.SphereGeometry(0.008, 16, 12),
+  new THREE.MeshBasicMaterial({ color: 0xff5a3c }));
+tip.position.set(0.064, 0, 0);
+parent.add(tip);
+const tipRing = new THREE.Mesh(
+  new THREE.TorusGeometry(0.018, 0.0016, 8, 32),
+  new THREE.MeshBasicMaterial({ color: 0xff5a3c, transparent:true, opacity:.5 }));
+tip.add(tipRing);
+
+// ---------------------------------------------------------------- 状态与应用
+const axisVec = CHAIN.joints.map(j => new THREE.Vector3(j.axis[0], j.axis[1], j.axis[2]).normalize());
+let q = [0, 0, 0, 0];           // 度
+
+function applyQ(deg) {
+  for (let i = 0; i < 4; i++) {
+    q[i] = deg[i];
+    pivots[i].quaternion.setFromAxisAngle(axisVec[i], deg[i] * Math.PI / 180);
+  }
+  refreshReadout();
+}
+
+const v3 = new THREE.Vector3();
+function tipWorld() { tip.getWorldPosition(v3); return v3.clone(); }
+
+// ---------------------------------------------------------------- UI
+const sliders = document.getElementById('sliders');
+CHAIN.joints.forEach((j, i) => {
+  const row = document.createElement('div');
+  row.className = 'row'; row.id = 'row' + i;
+  row.innerHTML = `<label>${j.name}</label>
+    <input type="range" min="${j.qmin}" max="${j.qmax}" step="0.5" value="0" id="s${i}">
+    <span class="val" id="v${i}">0°</span>`;
+  sliders.appendChild(row);
+  row.querySelector('input').addEventListener('input', e => {
+    if (playing) { playing = false; document.getElementById('playbtn').textContent = '▶ 播放'; }
+    const d = q.slice(); d[i] = parseFloat(e.target.value); applyQ(d);
+  });
+});
+
+const readout = document.getElementById('readout');
+function refreshReadout() {
+  CHAIN.joints.forEach((j, i) => {
+    document.getElementById('s' + i).value = q[i].toFixed(1);
+    document.getElementById('v' + i).textContent = q[i].toFixed(1) + '°';
+    const over = q[i] < j.qmin - 1e-6 || q[i] > j.qmax + 1e-6;
+    document.getElementById('row' + i).classList.toggle('bad', over);
+  });
+  const p = tipWorld();
+  const r = Math.hypot(p.x, p.y) * 1000;
+  const dz = (p.z - CHAIN.geom.Z_J2) * 1000;
+  const rr = Math.hypot(r, dz);
+  const sing = 1 - Math.abs(Math.cos(q[2] * Math.PI / 180));
+  const cells = [
+    ['末端 X', p.x * 1000], ['末端 Y', p.y * 1000], ['末端 Z', p.z * 1000],
+    ['半径 r', r],
+    ['可达范围', `${(CHAIN.geom.r_min*1000).toFixed(0)}–${(CHAIN.geom.r_max*1000).toFixed(0)} mm`],
+    ['奇异裕度', `${(sing*100).toFixed(0)}%`],
+  ];
+  readout.innerHTML = cells.map(([k, v]) =>
+    `<div><span>${k}</span>${typeof v === 'number' ? v.toFixed(1) : v}</div>`).join('');
+
+  const ok = rr >= CHAIN.geom.r_min * 1000 && rr <= CHAIN.geom.r_max * 1000;
+  const hud = document.getElementById('hud');
+  hud.innerHTML = `<b>r = ${rr.toFixed(1)} mm</b>（到 J2 轴）<br>
+    可达 ${(CHAIN.geom.r_min*1000).toFixed(0)}–${(CHAIN.geom.r_max*1000).toFixed(0)} mm
+    ${ok ? '' : '<span style="color:#e0614a"> · 超出工作空间</span>'}<br>
+    奇异裕度 ${(sing*100).toFixed(0)}% ${sing > 0.9 ? '<span style="color:#e0614a">· 接近奇异</span>' : ''}`;
+}
+
+// ---------------------------------------------------------------- 逆解（移植自 r4ctl/ik.py）
+const L1 = CHAIN.geom.L1, L3 = CHAIN.geom.L3, ZJ2 = CHAIN.geom.Z_J2;
+function wrapNear(v, ref) { if (ref === null || ref === undefined) return v;
+  return v + 2 * Math.PI * Math.round((ref - v) / (2 * Math.PI)); }
+
+function planar(du, dz, elbow) {
+  const r2 = du * du + dz * dz, r = Math.sqrt(r2);
+  let s = (L1 * L1 + L3 * L3 - r2) / (2 * L1 * L3);
+  if (s > 1.0000001 || s < -1.0000001) return null;
+  s = Math.max(-1, Math.min(1, s));
+  const q3 = elbow > 0 ? Math.asin(s) : Math.PI - Math.asin(s);
+  const c3 = Math.cos(q3);
+  const phi = Math.atan2(dz, du);
+  const A1 = phi - Math.atan2(-L3 * c3, L1 - L3 * s);
+  return { q2: Math.PI / 2 - A1, q3, r, s };
+}
+
+function solveIK(x, y, z, roll, qref) {
+  const q1 = Math.atan2(y, x);
+  const u0 = Math.hypot(x, y), dz = z - ZJ2;
+  const lo = CHAIN.joints.map(j => j.qmin * Math.PI / 180);
+  const hi = CHAIN.joints.map(j => j.qmax * Math.PI / 180);
+  const cands = [];
+  for (const [flip, u] of [[false, u0], [true, -u0]]) {
+    for (const e of [1, -1]) {
+      const p = planar(u, dz, e);
+      if (!p) continue;
+      const cand = [wrapNear(q1 + (flip ? Math.PI : 0), qref && qref[0] * Math.PI / 180),
+                    wrapNear(p.q2, qref && qref[1] * Math.PI / 180),
+                    p.q3, wrapNear(roll * Math.PI / 180, qref && qref[3] * Math.PI / 180)];
+      cands.push({ q: cand.map(v => v * 180 / Math.PI), e, flip, r: p.r });
+    }
+  }
+  if (!cands.length)
+    return { ok: false, msg: `不可达：r=${Math.hypot(u0, dz) * 1000} mm 超出 ${CHAIN.geom.r_min * 1000}–${CHAIN.geom.r_max * 1000} mm` };
+  const inside = c => c.q.every((v, i) => v >= lo[i] * 180 / Math.PI && v <= hi[i] * 180 / Math.PI);
+  const dist = c => qref ? Math.abs(c.q[0]-qref[0]) + Math.abs(c.q[1]-qref[1]) +
+                          Math.abs(c.q[2]-qref[2]) + Math.abs(c.q[3]-qref[3]) : 0;
+  const valid = cands.filter(inside);
+  const pick = (valid.length ? valid : cands).sort((a, b) => dist(a) - dist(b))[0];
+  const over = CHAIN.joints.map((j, i) => [j.name, pick.q[i]])
+    .filter(([, v], i) => v < CHAIN.joints[i].qmin - 1e-6 || v > CHAIN.joints[i].qmax + 1e-6);
+  return { ok: valid.length > 0, q: pick.q, e: pick.e, flip: pick.flip, r: pick.r,
+           msg: over.length ? '关节超限：' + over.map(([n, v]) => `${n}=${v.toFixed(1)}°`).join(', ')
+                            : `解算成功（${pick.flip ? '腰转 180° 反身解' : '正向解'}，${pick.e > 0 ? '肘前' : '肘后'}），r=${(pick.r * 1000).toFixed(1)} mm` };
+}
+
+let anim = null;
+function runIK(onlySolve) {
+  const x = parseFloat(document.getElementById('tx').value) / 1000;
+  const y = parseFloat(document.getElementById('ty').value) / 1000;
+  const z = parseFloat(document.getElementById('tz').value) / 1000;
+  const roll = parseFloat(document.getElementById('roll').value);
+  const res = solveIK(x, y, z, roll, q);
+  const m = document.getElementById('ikmsg');
+  m.textContent = res.msg;
+  m.className = 'msg ' + (res.ok ? 'ok' : 'err');
+  if (!res.q || onlySolve) return;
+  const from = q.slice(), to = res.q;
+  const T = 0.6, t0 = performance.now();
+  anim = () => {
+    const k = Math.min(1, (performance.now() - t0) / 1000 / T);
+    const s = k * k * (3 - 2 * k);
+    applyQ(from.map((v, i) => v + (to[i] - v) * s));
+    if (k < 1) requestAnimationFrame(anim); else anim = null;
+  };
+  requestAnimationFrame(anim);
+}
+
+document.getElementById('roll').addEventListener('input', e => {
+  document.getElementById('rollv').textContent = e.target.value + '°';
+});
+
+function preset(name) {
+  const P = {
+    zero: [0, 0, 0, 0],
+    reach: [0, -55, 25, 0],
+    fold: [0, 45, 95, 0],
+    side: [70, -20, 30, 45],
+  };
+  const to = P[name], from = q.slice(), T = 0.5, t0 = performance.now();
+  anim = () => {
+    const k = Math.min(1, (performance.now() - t0) / 1000 / T);
+    const s = k * k * (3 - 2 * k);
+    applyQ(from.map((v, i) => v + (to[i] - v) * s));
+    if (k < 1) requestAnimationFrame(anim); else anim = null;
+  };
+  requestAnimationFrame(anim);
+}
+
+// ---------------------------------------------------------------- 回放
+let playing = false, demoKey = null, tNow = 0, lastTS = 0;
+const demoSel = document.getElementById('demo');
+Object.entries(DEMOS).forEach(([k, d]) => {
+  const o = document.createElement('option');
+  o.value = k; o.textContent = d.label; demoSel.appendChild(o);
+});
+demoKey = demoSel.value;
+const tbar = document.getElementById('tbar');
+
+function demo() { return DEMOS[demoKey]; }
+function loadDemo() {
+  demoKey = demoSel.value; tNow = 0; playing = false;
+  document.getElementById('playbtn').textContent = '▶ 播放';
+  applyDemoAt(0);
+  document.getElementById('demomsg').textContent = demos_desc();
+}
+function demos_desc() {
+  const d = demo();
+  return `${d.desc}　全程最大关节误差 ${d.data.err_deg.toFixed(2)}°`;
+}
+function applyDemoAt(t) {
+  const d = demo().data;
+  const n = d.t.length;
+  t = Math.max(0, Math.min(d.t[n - 1], t));
+  let i = 0; while (i < n - 2 && d.t[i + 1] < t) i++;
+  const u = (t - d.t[i]) / Math.max(1e-9, d.t[i + 1] - d.t[i]);
+  const qq = d.q[i].map((v, k) => v + (d.q[i + 1][k] - v) * u);
+  applyQ(qq);
+  tbar.value = Math.round(t / d.t[n - 1] * 1000);
+  document.getElementById('tv').textContent = t.toFixed(2) + 's';
+  return qq;
+}
+function togglePlay() {
+  playing = !playing;
+  document.getElementById('playbtn').textContent = playing ? '❚❚ 暂停' : '▶ 播放';
+  if (playing && tNow >= demo().data.t[demo().data.t.length - 1]) tNow = 0;
+  lastTS = performance.now();
+}
+function stopDemo() {
+  playing = false;
+  document.getElementById('playbtn').textContent = '▶ 播放';
+  tNow = 0; applyDemoAt(0);
+}
+function scrub(v) {
+  const d = demo().data;
+  tNow = v / 1000 * d.t[d.t.length - 1];
+  playing = false;
+  document.getElementById('playbtn').textContent = '▶ 播放';
+  applyDemoAt(tNow);
+}
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
+});
+
+// ---------------------------------------------------------------- 交互
+let drag = null;
+renderer.domElement.addEventListener('mousedown', e => { drag = { x: e.clientX, y: e.clientY }; });
+window.addEventListener('mouseup', () => drag = null);
+window.addEventListener('mousemove', e => {
+  if (!drag) return;
+  camState.theta -= (e.clientX - drag.x) * 0.008;
+  camState.phi = Math.max(0.15, Math.min(3.0, camState.phi - (e.clientY - drag.y) * 0.008));
+  drag = { x: e.clientX, y: e.clientY };
+  updateCam();
+});
+renderer.domElement.addEventListener('wheel', e => {
+  e.preventDefault();
+  camState.dist = Math.max(0.5, Math.min(6, camState.dist * (1 + Math.sign(e.deltaY) * 0.08)));
+  updateCam();
+}, { passive: false });
+
+function resize() {
+  const w = VIEW.clientWidth, h = VIEW.clientHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h; camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+
+// ---------------------------------------------------------------- 主循环
+function tick(ts) {
+  if (playing) {
+    const dt = (ts - lastTS) / 1000; lastTS = ts;
+    const d = demo().data;
+    tNow += dt;
+    if (tNow > d.t[d.t.length - 1]) { tNow = d.t[d.t.length - 1]; playing = false;
+      document.getElementById('playbtn').textContent = '▶ 播放'; }
+    applyDemoAt(tNow);
+  }
+  renderer.render(scene, camera);
+  requestAnimationFrame(tick);
+}
+
+// 初始化
+resize(); updateCam();
+applyQ([0, 0, 0, 0]);
+loadDemo();
+applyQ([0, 0, 0, 0]);          // 打开时先看零位，按播放才动
+
+// 支持用 hash 直接跳到某个状态（便于截图/分享）：
+//   #q=0,-30,40,0       直接给关节角
+//   #ik=380,120,430     目标点（mm）
+//   #demo=circle&t=0.6  回放到某个时刻
+(function () {
+  const h = new URLSearchParams(location.hash.slice(1));
+  if (h.has('q')) applyQ(h.get('q').split(',').map(Number));
+  if (h.has('ik')) {
+    const [x, y, z] = h.get('ik').split(',').map(Number);
+    document.getElementById('tx').value = x;
+    document.getElementById('ty').value = y;
+    document.getElementById('tz').value = z;
+    const res = solveIK(x / 1000, y / 1000, z / 1000,
+                        parseFloat(document.getElementById('roll').value), q);
+    if (res.q) applyQ(res.q);
+    document.getElementById('ikmsg').textContent = res.msg;
+    document.getElementById('ikmsg').className = 'msg ' + (res.ok ? 'ok' : 'err');
+  }
+  if (h.has('demo')) {
+    demoSel.value = h.get('demo'); loadDemo();
+    if (h.has('t')) {
+      const d = demo().data, tt = parseFloat(h.get('t'));
+      scrub(Math.min(1000, tt / d.t[d.t.length - 1] * 1000));
+    }
+  }
+})();
+
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>

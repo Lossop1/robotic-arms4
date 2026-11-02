@@ -1,0 +1,36 @@
+{
+  "original_CAD_files_unchanged": 48,
+  "original_components": 192,
+  "restored_components": 201,
+  "original_component_definitions_unchanged": true,
+  "native_saved_transform_max_abs_error": 4.440892098500626e-16,
+  "native_mates": 8,
+  "native_mate_errors": 0,
+  "native_mate_warnings": 0,
+  "changes": [
+    {
+      "part": "P13",
+      "qty": 1
+    },
+    {
+      "part": "P14",
+      "qty": 4
+    },
+    {
+      "part": "H_M6x20",
+      "qty": 4
+    }
+  ],
+  "original_tool_face_mm": [
+    286,
+    0,
+    530
+  ],
+  "restored_tool_face_mm": [
+    304,
+    0,
+    530
+  ],
+  "tool_face_outward_shift_mm": 18,
+  "scope": "Same original 192 components plus the nine previously designed tool-interface components; geometry and placement restored from original source data."
+}

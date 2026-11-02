@@ -1,0 +1,170 @@
+{
+  "generated": "2026-10-30 16:29:05",
+  "source": "D:\\taili\\robotic-arm\\R4_Integrated_20261029\\R4_Integrated_20261029",
+  "instances": 201,
+  "links": {
+    "base_link": {
+      "mass_kg": 5.1062,
+      "com_mm": [
+        -0.016,
+        0.006,
+        58.492
+      ],
+      "instances": 27,
+      "triangles": 48514
+    },
+    "link1": {
+      "mass_kg": 4.5771,
+      "com_mm": [
+        -0.018,
+        -18.139,
+        114.641
+      ],
+      "instances": 56,
+      "triangles": 63862
+    },
+    "link2": {
+      "mass_kg": 4.1119,
+      "com_mm": [
+        0.045,
+        15.125,
+        184.581
+      ],
+      "instances": 37,
+      "triangles": 56650
+    },
+    "link3": {
+      "mass_kg": 4.7018,
+      "com_mm": [
+        161.511,
+        -10.854,
+        0.007
+      ],
+      "instances": 48,
+      "triangles": 62118
+    },
+    "link4": {
+      "mass_kg": 0.8391,
+      "com_mm": [
+        29.941,
+        0.0,
+        -0.0
+      ],
+      "instances": 33,
+      "triangles": 23464
+    }
+  },
+  "joints": [
+    {
+      "name": "joint1",
+      "type": "revolute",
+      "axis": [
+        0,
+        0,
+        1
+      ],
+      "point_mm": [
+        0.0,
+        0.0,
+        110.0
+      ],
+      "effort_Nm": 46.37,
+      "velocity_rad_s": 1.0,
+      "limit_deg": [
+        -180.0,
+        180.0
+      ]
+    },
+    {
+      "name": "joint2",
+      "type": "revolute",
+      "axis": [
+        0,
+        1,
+        0
+      ],
+      "point_mm": [
+        0.0,
+        0.0,
+        270.0
+      ],
+      "effort_Nm": 46.37,
+      "velocity_rad_s": 1.0,
+      "limit_deg": [
+        -100.0,
+        100.0
+      ]
+    },
+    {
+      "name": "joint3",
+      "type": "revolute",
+      "axis": [
+        0,
+        1,
+        0
+      ],
+      "point_mm": [
+        0.0,
+        36.0,
+        530.0
+      ],
+      "effort_Nm": 14.5,
+      "velocity_rad_s": 1.0,
+      "limit_deg": [
+        -140.0,
+        140.0
+      ]
+    },
+    {
+      "name": "joint4",
+      "type": "revolute",
+      "axis": [
+        1,
+        0,
+        0
+      ],
+      "point_mm": [
+        240.0,
+        0.0,
+        530.0
+      ],
+      "effort_Nm": 1.0,
+      "velocity_rad_s": 1.0,
+      "limit_deg": [
+        -180.0,
+        180.0
+      ]
+    },
+    {
+      "name": "tool_mount",
+      "type": "fixed",
+      "axis": [
+        1,
+        0,
+        0
+      ],
+      "point_mm": [
+        304.0,
+        0.0,
+        530.0
+      ],
+      "effort_Nm": null,
+      "velocity_rad_s": null,
+      "limit_deg": null
+    }
+  ],
+  "assumptions": {
+    "density": {
+      "structure": 2700.0,
+      "fastener": 7850.0,
+      "motor": 3500.0
+    },
+    "joint_limits": "包内无机械限位数据，取保守行程，需实测替换",
+    "effort": "重力静力矩最坏工况(采样 q2/q3/q4)x1.5",
+    "velocity": "占位值 1.0 rad/s，需按电机减速比替换",
+    "inertia": "由 B-rep 实体体积分+上述密度估算",
+    "collision": "每个连杆取视觉网格的凸包（近似）"
+  },
+  "total_mass_kg": 19.3361,
+  "elapsed_s": 16.9
+}
