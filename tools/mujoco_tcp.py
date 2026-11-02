@@ -1,28 +1,32 @@
 # -*- coding: utf-8 -*-
-"""MuJoCo 可视化：**操控末端（TCP）**，IK 解关节——用来验证规划算法。
+"""MuJoCo 末端控制：在坐标系里改末端目标（红球），IK 解关节，机械臂去追。
 
-流程：键盘改目标 TCP -> ik() 解出四个关节角 -> position 执行器（CSP 位置环）跟踪。
-屏幕上打印 目标/实际 TCP、误差、关节角、奇异裕度。
+可见性设计（针对"不知道发生了什么"）：
+  - 红球 = 目标 TCP（直径 30 mm），开局就在末端下方 6 cm，一定看得见
+  - 绿球 = 实际末端（直径 20 mm）
+  - 终端每条命令都回显：收到什么 -> IK 结果 -> 当前误差
+
+两种输入方式：
+  1) 数字命令（无歧义，推荐）：在终端里输入
+        p 400 0 600            设定目标 TCP（单位 mm，世界系）
+        x 400 / y 0 / z 600    只改一个轴
+        +x 20 / -z 20          相对移动（mm）
+        roll 90                工具自转角（度）
+        home                   目标回到当前末端
+        status                 打印一次状态
+        quit                   退出
+  2) 键盘（可选）：W/S/A/D/Q/E 按住连续移动（按当前视角分解）
 
 用法:
-  python tools/mujoco_tcp.py             # 打开窗口，键盘操控末端
-  python tools/mujoco_tcp.py --headless  # 自检：扫一个方块轨迹，报告误差与不可达点
-
-按键:
-  A / D   TCP 沿 X −/+
-  W / S   TCP 沿 Y +/−
-  Q / E   TCP 沿 Z −/+
-  J / L   工具自转角 −/+
-  R       目标回到当前末端
-  G       重力开关
-  ESC     退出
+  python tools/mujoco_tcp.py             # 窗口 + 终端命令
+  python tools/mujoco_tcp.py --selftest  # 不开窗口，跑命令自检
 """
 from __future__ import annotations
 
 import argparse
 import math
-import os
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -35,60 +39,92 @@ from r4ctl.ik import fk, ik, singular_margin  # noqa: E402
 MJCF = ROOT / "data" / "models" / "r4_urdf" / "urdf" / "r4_mjcf.xml"
 
 
-class Keys:
-    """按住即连续移动（GetAsyncKeyState），另保留单次按键（msvcrt）。"""
-
-    VK = {'a': 0x41, 'd': 0x44, 'w': 0x57, 's': 0x53,
-          'q': 0x51, 'e': 0x45, 'j': 0x4A, 'l': 0x4C}
-
-    def __init__(self):
-        self.held = {}
-        try:
-            import ctypes
-            self.user32 = ctypes.windll.user32
-        except Exception:
-            self.user32 = None
-        try:
-            import msvcrt
-            self.m = msvcrt
-        except ImportError:
-            self.m = None
-
-    def poll(self):
-        out = []
-        if self.m is not None:
-            while self.m.kbhit():
-                out.append(self.m.getwch().lower())
-        if self.user32 is not None:
-            for k, vk in self.VK.items():
-                self.held[k] = bool(self.user32.GetAsyncKeyState(vk) & 0x8000)
-        return out
-
-    def down(self, k):
-        return self.held.get(k, False)
-
-
 def tcp_of(q):
-    """正解 -> 工具点 (m)"""
     return np.asarray(fk(np.asarray(q, dtype=float)), dtype=float).reshape(-1)[:3]
 
 
-def solve(p, roll, q_ref):
-    """返回 (q, ok)。ok=False 表示不可达/超限，保留上一次有效解。"""
+class Ctl:
+    """目标状态 + 最近的求解结果，供渲染和命令线程共享。"""
+
+    def __init__(self, p0):
+        self.lock = threading.Lock()
+        self.p = np.asarray(p0, dtype=float).copy()
+        self.roll = 0.0
+        self.q = np.zeros(4)
+        self.ok = True
+        self.err_mm = float("nan")
+
+    def set_p(self, p):
+        with self.lock:
+            self.p = np.asarray(p, dtype=float).copy()
+
+
+class Keys:
+    VK = {"a": 0x41, "d": 0x44, "w": 0x57, "s": 0x53, "q": 0x51, "e": 0x45}
+
+    def __init__(self):
+        try:
+            import ctypes
+            self.u = ctypes.windll.user32
+        except Exception:
+            self.u = None
+
+    def down(self, k):
+        if self.u is None:
+            return False
+        return bool(self.u.GetAsyncKeyState(self.VK[k]) & 0x8000)
+
+
+def apply_command(ctl, line, q_now):
+    parts = line.strip().split()
+    if not parts:
+        return ""
+    cmd = parts[0].lower()
     try:
-        r = ik(np.asarray(p, dtype=float), roll=roll, q_ref=q_ref)
-    except Exception:
-        return None, False
-    if r is None or not getattr(r, "ok", False):
-        return None, False
-    return np.asarray(r.q, dtype=float), True
+        with ctl.lock:
+            if cmd == "p" and len(parts) == 4:
+                ctl.p = np.array([float(v) for v in parts[1:4]]) / 1000.0
+                return f"目标 = {np.round(ctl.p*1000,1)} mm"
+            if cmd in ("x", "y", "z") and len(parts) == 2:
+                i = "xyz".index(cmd)
+                ctl.p[i] = float(parts[1]) / 1000.0
+                return f"目标 = {np.round(ctl.p*1000,1)} mm"
+            if cmd[0] in "+-" and cmd[1:] in ("x", "y", "z") and len(parts) == 2:
+                i = "xyz".index(cmd[1:])
+                sgn = 1.0 if cmd[0] == "+" else -1.0
+                ctl.p[i] += sgn * float(parts[1]) / 1000.0
+                return f"目标 = {np.round(ctl.p*1000,1)} mm"
+            if cmd == "roll" and len(parts) == 2:
+                ctl.roll = math.radians(float(parts[1]))
+                return f"工具角 = {float(parts[1]):.1f}°"
+            if cmd == "home":
+                ctl.p = np.asarray(tcp_of(q_now)).copy()
+                return f"目标 = {np.round(ctl.p*1000,1)} mm（当前末端）"
+            if cmd == "status":
+                return "__STATUS__"
+            if cmd in ("quit", "exit"):
+                return "__QUIT__"
+            return "无法识别：用 p x y z（mm）或 +x 20、home、status"
+    except ValueError:
+        return "数字格式不对"
+
+
+def stdin_thread(ctl, stop_evt):
+    for line in sys.stdin:
+        if stop_evt.is_set():
+            return
+        msg = apply_command(ctl, line, ctl.q)
+        if msg == "__QUIT__":
+            stop_evt.set()
+            return
+        if msg and msg != "__STATUS__":
+            print(f"\n[命令] {line.strip():22s} -> {msg}", flush=True)
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--mjcf", default=str(MJCF))
-    ap.add_argument("--headless", action="store_true")
-    ap.add_argument("--step-mm", type=float, default=5.0)
+    ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args()
 
     import mujoco
@@ -96,115 +132,102 @@ def main():
     data = mujoco.MjData(model)
     nq = min(model.nq, 4)
 
-    q_now = np.zeros(4)
-    p_now = tcp_of(q_now)
-    p_tgt = p_now.copy()
-    roll = 0.0
-    q_des = q_now.copy()
+    p_now = tcp_of(np.zeros(4))
+    # 默认目标：末端下方 6 cm —— 开局就看得见，且离机械臂有间距
+    ctl = Ctl(p_now + np.array([0.0, -0.06, -0.02]))
 
-    def step_once():
-        nonlocal q_des
-        q, ok = solve(p_tgt, roll, q_des)
-        if ok:
-            q_des = q
+    def solve_and_step():
+        with ctl.lock:
+            p_tgt, roll = ctl.p.copy(), ctl.roll
+        r = ik(p_tgt, roll=roll, q_ref=ctl.q)
+        with ctl.lock:
+            if r is not None and r.ok:
+                ctl.q = np.asarray(r.q, dtype=float)
+                ctl.ok = True
+            else:
+                ctl.ok = False
         for i in range(model.nu):
-            data.ctrl[i] = q_des[i] if i < len(q_des) else 0.0
+            data.ctrl[i] = ctl.q[i]
         mujoco.mj_step(model, data)
-
-    def report():
         q_act = np.array([data.qpos[i] for i in range(nq)])
-        p_act = tcp_of(q_act)
-        err = np.linalg.norm(p_tgt - p_act) * 1000
-        sm = singular_margin(q_des)
-        qd = "  ".join(f"J{i+1}={math.degrees(q_des[i]):+6.1f}" for i in range(4))
-        return (f"TCP 目标 ({p_tgt[0]*1000:+6.1f},{p_tgt[1]*1000:+6.1f},{p_tgt[2]*1000:+6.1f}) mm"
-                f"  误差 {err:5.1f} mm  奇异裕度 {sm:.2f}  {qd}")
+        with ctl.lock:
+            ctl.err_mm = float(np.linalg.norm(p_tgt - tcp_of(q_act)) * 1000)
+        return q_act
 
-    if args.headless:
-        base = p_now.copy()
-        ok_n, bad_n, errs = 0, 0, []
-        for k in range(240):
-            t = k / 60.0
-            p_tgt[:] = base + np.array([0.03 * math.sin(2 * math.pi * 0.3 * t),
-                                        0.03 * math.cos(2 * math.pi * 0.3 * t),
-                                        0.02 * math.sin(2 * math.pi * 0.5 * t)])
-            q, ok = solve(p_tgt, roll, q_des)
-            ok_n += ok
-            bad_n += (not ok)
-            if ok:
-                q_des = q
-            for i in range(model.nu):
-                data.ctrl[i] = q_des[i]
-            for _ in range(4):
-                mujoco.mj_step(model, data)
-            errs.append(np.linalg.norm(
-                p_tgt - tcp_of(np.array([data.qpos[i] for i in range(nq)]))) * 1000)
-        print(f"headless：可达 {ok_n} 帧 / 不可达 {bad_n} 帧，"
-              f"末端误差 中位 {np.median(errs):.2f} mm 最大 {np.max(errs):.2f} mm")
-        print(report())
+    def status_line(q_act):
+        with ctl.lock:
+            p_tgt, qd, ok, err = ctl.p.copy(), ctl.q.copy(), ctl.ok, ctl.err_mm
+        p_act = tcp_of(q_act)
+        js = " ".join(f"J{i+1}={math.degrees(qd[i]):+6.1f}" for i in range(4))
+        flag = "OK " if ok else "IK失败(保留上次解)"
+        return (f"目标({p_tgt[0]*1000:+.0f},{p_tgt[1]*1000:+.0f},{p_tgt[2]*1000:+.0f}) "
+                f"实际({p_act[0]*1000:+.0f},{p_act[1]*1000:+.0f},{p_act[2]*1000:+.0f}) "
+                f"误差{err:5.1f}mm 奇异{singular_margin(qd):.2f} {flag} {js}")
+
+    if args.selftest:
+        base = ctl.p.copy()
+        print(f"起点目标 {np.round(base*1000,1)} mm")
+        for dx in (0, 20, 40, 60):
+            ctl.set_p(base + np.array([dx / 1000.0, 0, 0]))
+            for _ in range(200):
+                q_act = solve_and_step()
+            print(f"  X+{dx:3d}mm -> {status_line(q_act)}")
+        ctl.set_p(base + np.array([0, 0, -0.25]))
+        for _ in range(200):
+            q_act = solve_and_step()
+        print(f"  超范围   -> {status_line(q_act)}")
         return 0
 
     import mujoco.viewer as mjv
     keys = Keys()
+    stop_evt = threading.Event()
+    threading.Thread(target=stdin_thread, args=(ctl, stop_evt), daemon=True).start()
+    print("命令示例：p 400 0 600 / +x 20 / home / status / quit     （也可按住 W/S/A/D/Q/E）")
+
     with mjv.launch_passive(model, data) as viewer:
-        viewer.cam.distance = 1.6
-        viewer.cam.elevation = -18
+        viewer.cam.distance = 1.7
+        viewer.cam.elevation = -15
         viewer.cam.azimuth = 130
-        d = args.step_mm / 1000.0
-        rate = 0.15                       # 按住时的移动速度 m/s
-        last = time.perf_counter()
-        last_move = last
-        while viewer.is_running():
+        viewer.cam.lookat[:] = np.array([0.15, 0.0, 0.35])
+        rate = 0.04
+        last_t = time.perf_counter()
+        last_print = 0.0
+        while viewer.is_running() and not stop_evt.is_set():
             now = time.perf_counter()
-            dt_move = now - last_move
-            last_move = now
-            if keys.down('a'): p_tgt[0] -= rate * dt_move
-            if keys.down('d'): p_tgt[0] += rate * dt_move
-            if keys.down('w'): p_tgt[1] += rate * dt_move
-            if keys.down('s'): p_tgt[1] -= rate * dt_move
-            if keys.down('q'): p_tgt[2] -= rate * dt_move
-            if keys.down('e'): p_tgt[2] += rate * dt_move
-            if keys.down('j'): roll -= 1.5 * dt_move
-            if keys.down('l'): roll += 1.5 * dt_move
-            for ch in keys.poll():
-                if ch == "\x1b":
-                    return 0
-                elif ch == "a":
-                    p_tgt[0] -= d
-                elif ch == "d":
-                    p_tgt[0] += d
-                elif ch == "w":
-                    p_tgt[1] += d
-                elif ch == "s":
-                    p_tgt[1] -= d
-                elif ch == "q":
-                    p_tgt[2] -= d
-                elif ch == "e":
-                    p_tgt[2] += d
-                elif ch == "j":
-                    roll -= math.radians(5)
-                elif ch == "l":
-                    roll += math.radians(5)
-                elif ch == "r":
-                    p_tgt[:] = tcp_of(np.array([data.qpos[i] for i in range(nq)]))
-                elif ch == "g":
-                    model.opt.gravity[2] *= -1.0
-            step_once()
+            dt = now - last_t
+            last_t = now
+            az = math.radians(viewer.cam.azimuth)
+            fwd = np.array([-math.sin(az), math.cos(az), 0.0])
+            right = np.array([math.cos(az), math.sin(az), 0.0])
+            with ctl.lock:
+                if keys.down("w"): ctl.p += fwd * rate * dt
+                if keys.down("s"): ctl.p -= fwd * rate * dt
+                if keys.down("a"): ctl.p -= right * rate * dt
+                if keys.down("d"): ctl.p += right * rate * dt
+                if keys.down("q"): ctl.p[2] -= rate * dt
+                if keys.down("e"): ctl.p[2] += rate * dt
+
+            q_act = solve_and_step()
+
             scn = viewer.user_scn
             scn.ngeom = 0
-            if scn.ngeom < len(scn.geoms):
-                g = scn.geoms[0]
-                mujoco.mjv_initGeom(
-                    g, mujoco.mjtGeom.mjGEOM_SPHERE,
-                    np.array([0.012, 0.012, 0.012]),
-                    np.asarray(p_tgt, dtype=float),
-                    np.eye(3).reshape(-1),
-                    np.array([1.0, 0.25, 0.25, 1.0]))
-                scn.ngeom = 1
+            with ctl.lock:
+                p_tgt = ctl.p.copy()
+            for pos, rad, rgba in ((p_tgt, 0.015, (1.0, 0.15, 0.15, 1.0)),
+                                   (tcp_of(q_act), 0.010, (0.15, 1.0, 0.25, 1.0))):
+                if scn.ngeom < len(scn.geoms):
+                    g = scn.geoms[scn.ngeom]
+                    mujoco.mjv_initGeom(g, mujoco.mjtGeom.mjGEOM_SPHERE,
+                                        np.array([rad, rad, rad]),
+                                        np.asarray(pos, dtype=np.float64),
+                                        np.eye(3).reshape(-1),
+                                        np.array(rgba, dtype=np.float32))
+                    scn.ngeom += 1
             viewer.sync()
-            if time.perf_counter() - last > 0.5:
-                last = time.perf_counter()
-                print("\r" + report(), end="", flush=True)
+
+            if now - last_print > 0.4:
+                last_print = now
+                print("\r" + status_line(q_act), end="", flush=True)
             time.sleep(model.opt.timestep)
     return 0
 
