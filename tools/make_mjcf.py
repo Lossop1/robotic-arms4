@@ -132,7 +132,8 @@ def main():
         for j in joints:
             if j["parent"] == name:
                 q = rpy_to_quat(*j["rpy"])
-                emit_body(j["child"], indent + 1, j["xyz"], q,
+                q_mj = (q[3], q[0], q[1], q[2])      # MuJoCo 要 (w,x,y,z)
+                emit_body(j["child"], indent + 1, j["xyz"], q_mj,
                           j if j["type"] in ("revolute", "continuous") else None)
         a(f"{pad}</body>")
 
