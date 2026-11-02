@@ -107,7 +107,16 @@ python tools/make_mjcf.py          # URDF -> MJCF（含 CSP 位置执行器）
 python tools/mujoco_view.py        # 打开窗口，用键盘自己控制
 `
 
-按键：1–4 选关节，A/D 转 ±5°，W/S 微调，R 回零，G 重力开关，Q 退出。
+两种控制方式：
+
+`ash
+python tools/mujoco_view.py     # 关节空间：1-4 选关节，A/D 转 ±5°
+python tools/mujoco_tcp.py      # 末端空间：A/D 沿 X，W/S 沿 Y，Q/E 沿 Z，J/L 转工具
+`
+
+mujoco_tcp.py 走的是 **键盘改目标 TCP → ik() 解关节 → 位置执行器跟踪**，
+用来验证规划/逆解：界面每 0.5 s 打印目标与实际 TCP、误差（mm）、奇异裕度。
+
 每个关节是一个 position 执行器（kp/kv），对应真机的 CSP 位置环；
 --headless 只跑物理不开窗口，用于自检。
 
