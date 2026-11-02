@@ -74,6 +74,7 @@ class Ctl:
         self.ok = True
         self.err_mm = float("nan")
         self.rate = 0.04          # 按住键盘时的移动速度 m/s
+        self.kp_wanted = None     # 若设置，热更新执行器刚度
 
     def set_p(self, p):
         with self.lock:
@@ -121,6 +122,8 @@ def apply_command(ctl, line, q_now):
             if cmd == "home":
                 ctl.p = np.asarray(tcp_of(q_now)).copy()
                 return f"目标 = {np.round(ctl.p*1000,1)} mm（当前末端）"
+            if cmd == "kp" and len(parts) == 2:
+                return f"__KP__{float(parts[1])}"
             if cmd == "speed" and len(parts) == 2:
                 return f"__SPEED__{float(parts[1])}"
             if cmd == "frame":
@@ -139,6 +142,15 @@ def stdin_thread(ctl, stop_evt):
         if stop_evt.is_set():
             return
         msg = apply_command(ctl, line, ctl.q)
+        if msg.startswith("__KP__"):
+            try:
+                kp = float(msg.replace("__KP__", ""))
+                with ctl.lock:
+                    ctl.kp_wanted = kp
+                print(f"\n[命令] kp -> {kp:.0f} N·m/rad", flush=True)
+            except ValueError:
+                print("\n kp 值不对", flush=True)
+            continue
         if msg.startswith("__SPEED__"):
             try:
                 spd = float(msg.replace("__SPEED__", ""))
@@ -243,15 +255,29 @@ def main():
                 if keys.down("q"): ctl.p[2] -= ctl.rate * dt
                 if keys.down("e"): ctl.p[2] += ctl.rate * dt
 
+            with ctl.lock:
+                kp_new = ctl.kp_wanted
+            if kp_new is not None:
+                for i in range(model.nu):
+                    model.actuator_gainprm[i, 0] = kp_new
+                    model.actuator_biasprm[i, 1] = -kp_new
             q_act = solve_and_step()
 
             scn = viewer.user_scn
             scn.ngeom = 0
             # 基座坐标系：X 红 / Y 绿 / Z 蓝，各 120 mm
+            base_o = np.array([0.0, 0.0, 0.06])
             for ax, col in ((np.array([1.0,0,0]), (1.0,0.2,0.2,1.0)),
                             (np.array([0,1.0,0]), (0.2,1.0,0.2,1.0)),
                             (np.array([0,0,1.0]), (0.3,0.5,1.0,1.0))):
-                add_capsule(mujoco, scn, np.zeros(3), ax*0.12, 0.004, col)
+                add_capsule(mujoco, scn, base_o, base_o + ax*0.15, 0.005, col)
+            # 目标点处再画一小撮三轴：数字就是按这套轴读的
+            with ctl.lock:
+                _t = ctl.p.copy()
+            for ax, col in ((np.array([1.0,0,0]), (1.0,0.4,0.4,1.0)),
+                            (np.array([0,1.0,0]), (0.4,1.0,0.4,1.0)),
+                            (np.array([0,0,1.0]), (0.5,0.6,1.0,1.0))):
+                add_capsule(mujoco, scn, _t, _t + ax*0.05, 0.003, col)
             with ctl.lock:
                 _spd = rate
             with ctl.lock:
