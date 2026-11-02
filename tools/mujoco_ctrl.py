@@ -105,9 +105,12 @@ def main():
             elif law == "pdg":
                 tau = kp * e + kd * ed + ch.gravity(q_d)
             elif law == "pdgf":
-                # 用 tanh 平滑 sign，避免零速附近抖振
+                # 摩擦前馈：sign 有零速抖振，tanh 版本我调坏了（会发散），
+                # 先用 sign + 死区，等专门整定再改（见 README 未决问题）
+                v = qd_d.copy()
+                v[np.abs(v) < 0.02] = 0.0
                 tau = (kp * e + kd * ed + ch.gravity(q_d)
-                       + FC * np.tanh(np.degrees(qd) / 1.0) + FV * np.degrees(qd))
+                       + FC * np.sign(v) + FV * np.degrees(v))
             else:   # ctc
                 Mq = np.asarray(ch.mass_matrix(q_d), dtype=float)
                 bias = np.asarray(ch.bias(q_d, qd_d), dtype=float)
