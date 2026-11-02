@@ -36,22 +36,36 @@ MJCF = ROOT / "data" / "models" / "r4_urdf" / "urdf" / "r4_mjcf.xml"
 
 
 class Keys:
+    """按住即连续移动（GetAsyncKeyState），另保留单次按键（msvcrt）。"""
+
+    VK = {'a': 0x41, 'd': 0x44, 'w': 0x57, 's': 0x53,
+          'q': 0x51, 'e': 0x45, 'j': 0x4A, 'l': 0x4C}
+
     def __init__(self):
+        self.held = {}
+        try:
+            import ctypes
+            self.user32 = ctypes.windll.user32
+        except Exception:
+            self.user32 = None
         try:
             import msvcrt
             self.m = msvcrt
-            self.ok = True
         except ImportError:
             self.m = None
-            self.ok = False
 
     def poll(self):
         out = []
-        if not self.ok:
-            return out
-        while self.m.kbhit():
-            out.append(self.m.getwch().lower())
+        if self.m is not None:
+            while self.m.kbhit():
+                out.append(self.m.getwch().lower())
+        if self.user32 is not None:
+            for k, vk in self.VK.items():
+                self.held[k] = bool(self.user32.GetAsyncKeyState(vk) & 0x8000)
         return out
+
+    def down(self, k):
+        return self.held.get(k, False)
 
 
 def tcp_of(q):
@@ -137,8 +151,21 @@ def main():
         viewer.cam.elevation = -18
         viewer.cam.azimuth = 130
         d = args.step_mm / 1000.0
+        rate = 0.15                       # 按住时的移动速度 m/s
         last = time.perf_counter()
+        last_move = last
         while viewer.is_running():
+            now = time.perf_counter()
+            dt_move = now - last_move
+            last_move = now
+            if keys.down('a'): p_tgt[0] -= rate * dt_move
+            if keys.down('d'): p_tgt[0] += rate * dt_move
+            if keys.down('w'): p_tgt[1] += rate * dt_move
+            if keys.down('s'): p_tgt[1] -= rate * dt_move
+            if keys.down('q'): p_tgt[2] -= rate * dt_move
+            if keys.down('e'): p_tgt[2] += rate * dt_move
+            if keys.down('j'): roll -= 1.5 * dt_move
+            if keys.down('l'): roll += 1.5 * dt_move
             for ch in keys.poll():
                 if ch == "\x1b":
                     return 0
@@ -163,6 +190,17 @@ def main():
                 elif ch == "g":
                     model.opt.gravity[2] *= -1.0
             step_once()
+            scn = viewer.user_scn
+            scn.ngeom = 0
+            if scn.ngeom < len(scn.geoms):
+                g = scn.geoms[0]
+                mujoco.mjv_initGeom(
+                    g, mujoco.mjtGeom.mjGEOM_SPHERE,
+                    np.array([0.012, 0.012, 0.012]),
+                    np.asarray(p_tgt, dtype=float),
+                    np.eye(3).reshape(-1),
+                    np.array([1.0, 0.25, 0.25, 1.0]))
+                scn.ngeom = 1
             viewer.sync()
             if time.perf_counter() - last > 0.5:
                 last = time.perf_counter()
