@@ -47,6 +47,10 @@ def main():
 
     import mujoco
     model = mujoco.MjModel.from_xml_path(str(MJCF))
+    # 应用 --kp：position 执行器的 gainprm[0]=kp，biasprm[1]=-kp
+    for i in range(model.nu):
+        model.actuator_gainprm[i, 0] = args.kp
+        model.actuator_biasprm[i, 1] = -args.kp
     data = mujoco.MjData(model)
     N = int(args.t / model.opt.timestep)
 
