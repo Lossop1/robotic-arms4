@@ -136,7 +136,7 @@ def phase_steps(rig, step=0.05, n=30, settle=0.15):
     return rig.finish("steps")
 
 
-def phase_sine(rig, freqs=(0.5, 1, 2, 4, 8), amp=0.5, cycles=6, dwell=2.0):
+def phase_sine(rig, freqs=(0.5, 1, 2, 4, 8), amp=3.0, cycles=6, dwell=2.0):
     """小幅正弦：每段前先回 0 停 dwell 秒，避免追赶瞬态污染窗口。"""
     rig.start()
     t = 0.0
