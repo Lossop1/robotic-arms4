@@ -78,36 +78,36 @@
     </collision>
   </link>
   <link name="tool_link"/>
-  <joint name="joint1" type="revolute">
+  <joint name="joint1" type="continuous">
     <parent link="base_link"/>
     <child link="link1"/>
     <origin xyz="0 0 0.11" rpy="0 0 0"/>
     <axis xyz="0 0 1"/>
-    <limit lower="-3.14159265" upper="3.14159265" effort="46.37" velocity="1"/>
+    <limit effort="46.37" velocity="1"/>
     <dynamics damping="0.5" friction="0.2"/>
   </joint>
-  <joint name="joint2" type="revolute">
+  <joint name="joint2" type="continuous">
     <parent link="link1"/>
     <child link="link2"/>
     <origin xyz="0 0 0.16" rpy="0 0 0"/>
     <axis xyz="0 1 0"/>
-    <limit lower="-1.74532925" upper="1.74532925" effort="46.37" velocity="1"/>
+    <limit effort="46.37" velocity="1"/>
     <dynamics damping="0.5" friction="0.2"/>
   </joint>
-  <joint name="joint3" type="revolute">
+  <joint name="joint3" type="continuous">
     <parent link="link2"/>
     <child link="link3"/>
     <origin xyz="0 0.036 0.26" rpy="0 0 0"/>
     <axis xyz="0 1 0"/>
-    <limit lower="-2.44346095" upper="2.44346095" effort="14.5" velocity="1"/>
+    <limit effort="14.5" velocity="1"/>
     <dynamics damping="0.5" friction="0.2"/>
   </joint>
-  <joint name="joint4" type="revolute">
+  <joint name="joint4" type="continuous">
     <parent link="link3"/>
     <child link="link4"/>
     <origin xyz="0.24 -0.036 0" rpy="0 0 0"/>
     <axis xyz="1 0 0"/>
-    <limit lower="-3.14159265" upper="3.14159265" effort="1" velocity="1"/>
+    <limit effort="1" velocity="1"/>
     <dynamics damping="0.5" friction="0.2"/>
   </joint>
   <joint name="tool_mount" type="fixed">

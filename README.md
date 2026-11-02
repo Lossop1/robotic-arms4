@@ -87,6 +87,19 @@ ated.torque_nm（0x6076 实测） | 10.0 N·m |
 | 设计 f_n | 带宽 ÷ 0.64 ÷ 2（相位裕度） | 1.17 Hz |
 | Kp / Kd | M_eff × ω²、2ζ M_eff ω | J1 89.5 / 24.3；J3 21.1 / 5.7 |
 
+## 机型
+
+**R4 = 用 4 台 LZ12028CH 关节模组搭的四轴臂**，几何来自装配包
+data/cad/R4_Integrated_20261029/source/assembly.json（SolidWorks 导出，mm）。
+装配里每个关节由 J*_motor（零件 MotorReference）与 J*_hub（零件 P04）组成，
+关节轴由 P04 毂的圆柱面法向确定。
+
+**关节无机械限位，可连续旋转** → URDF 中 4 个关节为 continuous；
+config.py 里的 q_min/q_max 是**软件限位**（防绕线/自碰），不是机械行程。
+
+执行器参数以厂家规格表为准：行星 28:1、额定 100 N·m、峰值 360 N·m、
+额定 80 rpm（输出 480 °/s）、双编码器、无刹车、重 2.27 kg。
+
 ## 未决问题
 
 1. **额定转矩 10 N·m 与 LZ12028 标称 80 N·m 差 8 倍**：需用 CST 下发已知 per-mille 并读回标定。

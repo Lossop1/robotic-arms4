@@ -47,17 +47,17 @@ DECIMATE = {"MotorReference": 0.35}
 # 每个连杆坐标系 = 其关节轴上的点，姿态与装配坐标系一致（纯平移）；原点在 z=0 基座面
 CHAIN = [
     dict(joint="joint1", parent="base_link", child="link1", axis=(0, 0, 1),
-         point_mm=(0.0, 0.0, 110.0), kind="revolute",
-         limit_deg=(-180.0, 180.0), effort=None, velocity=1.0),
+         point_mm=(0.0, 0.0, 110.0), kind="continuous",
+        limit_deg=None, effort=None, velocity=1.0),
     dict(joint="joint2", parent="link1", child="link2", axis=(0, 1, 0),
-         point_mm=(0.0, 0.0, 270.0), kind="revolute",
-         limit_deg=(-100.0, 100.0), effort=None, velocity=1.0),
+         point_mm=(0.0, 0.0, 270.0), kind="continuous",
+        limit_deg=None, effort=None, velocity=1.0),
     dict(joint="joint3", parent="link2", child="link3", axis=(0, 1, 0),
-         point_mm=(0.0, 36.0, 530.0), kind="revolute",
-         limit_deg=(-140.0, 140.0), effort=None, velocity=1.0),
+         point_mm=(0.0, 36.0, 530.0), kind="continuous",
+        limit_deg=None, effort=None, velocity=1.0),
     dict(joint="joint4", parent="link3", child="link4", axis=(1, 0, 0),
-         point_mm=(240.0, 0.0, 530.0), kind="revolute",
-         limit_deg=(-180.0, 180.0), effort=None, velocity=1.0),
+         point_mm=(240.0, 0.0, 530.0), kind="continuous",
+        limit_deg=None, effort=None, velocity=1.0),
     dict(joint="tool_mount", parent="link4", child="tool_link", axis=(1, 0, 0),
          point_mm=(304.0, 0.0, 530.0), kind="fixed",
          limit_deg=None, effort=None, velocity=None),
@@ -196,7 +196,7 @@ def joint_frames(q_deg):
         # 关节在父连杆坐标系的平移（父系已带姿态 -> 用父系 R 旋转平移量）
         off = R_acc @ (p_j - p_prev)
         p_world = out[-1][2] + off
-        if j["kind"] == "revolute":
+        if j["kind"] in ("revolute", "continuous"):
             R_child = R_acc @ rot_axis(np.array(j["axis"], dtype=float), math.radians(q_deg[idx]))
         else:
             R_child = R_acc
@@ -209,14 +209,14 @@ def compute_effort(masses_coms):
     """每个转动关节：采样工作空间内的重力静力矩最大值 x1.5。
     masses_coms: {link_name: (m, com_mm)}"""
     sample = [-140, -100, -45, 0, 45, 100, 140]
-    best = {j["joint"]: 0.0 for j in CHAIN if j["kind"] == "revolute"}
+    best = {j["joint"]: 0.0 for j in CHAIN if j["kind"] in ("revolute", "continuous")}
     for q1 in (0.0,):
         for q2 in sample:
             for q3 in sample:
                 for q4 in sample:
                     fr = {n: (R, p) for n, R, p in joint_frames([q1, q2, q3, q4])}
                     for idx, j in enumerate(CHAIN):
-                        if j["kind"] != "revolute":
+                        if j["kind"] not in ("revolute", "continuous"):
                             continue
                         name = j["joint"]
                         child = j["child"]
@@ -361,15 +361,19 @@ def build(args):
             a(f'    <parent link="{j["parent"]}"/>')
             a(f'    <child link="{j["child"]}"/>')
             a(f'    <origin xyz="{vec(off)}" rpy="0 0 0"/>')
-            if j["kind"] == "revolute":
-                lo, hi = j["limit_deg"]
+            if j["kind"] in ("revolute", "continuous"):
                 a(f'    <axis xyz="{vec(j["axis"])}"/>')
-                a(f'    <limit lower="{fmt(math.radians(lo))}" upper="{fmt(math.radians(hi))}" '
-                  f'effort="{fmt(effort[j["joint"]])}" velocity="{fmt(j["velocity"])}"/>')
+                if j["kind"] == "revolute":
+                    lo, hi = j["limit_deg"]
+                    a(f'    <limit lower="{fmt(math.radians(lo))}" upper="{fmt(math.radians(hi))}" '
+                      f'effort="{fmt(effort[j["joint"]])}" velocity="{fmt(j["velocity"])}"/>')
+                else:
+                    # 无机械限位：只给 effort/velocity，不给 lower/upper
+                    a(f'    <limit effort="{fmt(effort[j["joint"]])}" velocity="{fmt(j["velocity"])}"/>')
                 a(f'    <dynamics damping="0.5" friction="0.2"/>')
             a(f'  </joint>')
         for j in CHAIN:
-            if j["kind"] != "revolute":
+            if j["kind"] not in ("revolute", "continuous"):
                 continue
             a(f'  <transmission name="{j["joint"]}_trans">')
             a('    <type>transmission_interface/SimpleTransmission</type>')

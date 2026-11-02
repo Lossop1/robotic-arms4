@@ -93,7 +93,7 @@ def parse(path: Path):
             rpy=[float(v) for v in o.get("rpy").split()] if o is not None else [0, 0, 0],
             axis=[float(v) for v in ax.get("xyz").split()] if ax is not None else [0, 0, 1],
             limit=None if lim is None else dict(
-                lower=float(lim.get("lower")), upper=float(lim.get("upper")),
+                lower=float(lim.get("lower") or -math.pi), upper=float(lim.get("upper") or math.pi),
                 effort=float(lim.get("effort")), velocity=float(lim.get("velocity"))),
         ))
     return robot.get("name"), links, joints

@@ -1,5 +1,5 @@
 {
-  "generated": "2026-11-02 12:19:38",
+  "generated": "2026-11-02 14:12:13",
   "source": "D:\\taili\\robotic-arm\\data\\cad\\R4_Integrated_20261029",
   "instances": 201,
   "links": {
@@ -57,7 +57,7 @@
   "joints": [
     {
       "name": "joint1",
-      "type": "revolute",
+      "type": "continuous",
       "axis": [
         0,
         0,
@@ -70,14 +70,11 @@
       ],
       "effort_Nm": 46.37,
       "velocity_rad_s": 1.0,
-      "limit_deg": [
-        -180.0,
-        180.0
-      ]
+      "limit_deg": null
     },
     {
       "name": "joint2",
-      "type": "revolute",
+      "type": "continuous",
       "axis": [
         0,
         1,
@@ -90,14 +87,11 @@
       ],
       "effort_Nm": 46.37,
       "velocity_rad_s": 1.0,
-      "limit_deg": [
-        -100.0,
-        100.0
-      ]
+      "limit_deg": null
     },
     {
       "name": "joint3",
-      "type": "revolute",
+      "type": "continuous",
       "axis": [
         0,
         1,
@@ -110,14 +104,11 @@
       ],
       "effort_Nm": 14.5,
       "velocity_rad_s": 1.0,
-      "limit_deg": [
-        -140.0,
-        140.0
-      ]
+      "limit_deg": null
     },
     {
       "name": "joint4",
-      "type": "revolute",
+      "type": "continuous",
       "axis": [
         1,
         0,
@@ -130,10 +121,7 @@
       ],
       "effort_Nm": 1.0,
       "velocity_rad_s": 1.0,
-      "limit_deg": [
-        -180.0,
-        180.0
-      ]
+      "limit_deg": null
     },
     {
       "name": "tool_mount",
@@ -166,5 +154,5 @@
     "collision": "每个连杆取视觉网格的凸包（近似）"
   },
   "total_mass_kg": 19.3361,
-  "elapsed_s": 15.4
+  "elapsed_s": 20.8
 }
