@@ -15,7 +15,7 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 CPD = 16384 * 28 / 360.0
-SRC = ROOT / "data" / "bench" / "obs_steps_sine.csv"
+SRC = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "data" / "bench" / "obs_steps_sine.csv"
 
 
 def load(p):
@@ -39,7 +39,7 @@ def split_phases(d):
     sine = ~steps
     # 正弦段：把"目标几乎不动 ≥1 s"的平台当分隔
     v = np.gradient(tgt, t)
-    still = np.abs(v) < 0.05
+    still = np.abs(v) < 0.02
     segs, start = [], None
     i = 0
     n = len(t)

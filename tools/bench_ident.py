@@ -140,12 +140,14 @@ def phase_sine(rig, freqs=(0.5, 1, 2, 4, 8), amp=0.5, cycles=6, dwell=2.0):
     """小幅正弦：每段前先回 0 停 dwell 秒，避免追赶瞬态污染窗口。"""
     rig.start()
     t = 0.0
+    marks = []
     for f in freqs:
         rig.send_deg(0.0)
         t += dwell
         rig.sleep_until(t)
         T = 1.0 / f
         n = int(cycles * T * rig.hz)
+        marks.append([round(t, 4), round(t + n / rig.hz, 4), f])
         for k in range(n):
             tt = k / rig.hz
             q = amp * math.sin(2 * math.pi * f * tt)
@@ -154,6 +156,8 @@ def phase_sine(rig, freqs=(0.5, 1, 2, 4, 8), amp=0.5, cycles=6, dwell=2.0):
             t += 1.0 / rig.hz
             rig.sleep_until(t)
     rig.send_deg(0.0)
+    import json
+    Path("/tmp/ident_sine_marks.json").write_text(json.dumps(marks), encoding="utf-8")
     return rig.finish("sine")
 
 
