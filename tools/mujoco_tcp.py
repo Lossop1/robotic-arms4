@@ -134,7 +134,7 @@ def main():
 
     p_now = tcp_of(np.zeros(4))
     # 默认目标：末端下方 6 cm —— 开局就看得见，且离机械臂有间距
-    ctl = Ctl(p_now + np.array([0.0, -0.06, -0.02]))
+    ctl = Ctl(p_now)
 
     def solve_and_step():
         with ctl.lock:
@@ -213,8 +213,26 @@ def main():
             scn.ngeom = 0
             with ctl.lock:
                 p_tgt = ctl.p.copy()
-            for pos, rad, rgba in ((p_tgt, 0.015, (1.0, 0.15, 0.15, 1.0)),
-                                   (tcp_of(q_act), 0.010, (0.15, 1.0, 0.25, 1.0))):
+            p_act3 = tcp_of(q_act)
+            tgt_rgba = (1.0, 0.15, 0.15, 1.0) if ctl.ok else (1.0, 0.6, 0.0, 1.0)
+            # 连杆：从实际末端指向目标，长度 = 当前误差
+            d = np.asarray(p_tgt) - np.asarray(p_act3)
+            L = float(np.linalg.norm(d))
+            if L > 1e-4 and scn.ngeom < len(scn.geoms):
+                z = d / L
+                tmp = np.array([1.0, 0, 0]) if abs(z[0]) < 0.9 else np.array([0, 1.0, 0])
+                x = np.cross(tmp, z); x /= np.linalg.norm(x)
+                y = np.cross(z, x)
+                mat = np.column_stack([x, y, z]).ravel()
+                g = scn.geoms[scn.ngeom]
+                mujoco.mjv_initGeom(g, mujoco.mjtGeom.mjGEOM_CAPSULE,
+                                    np.array([0.004, L / 2, 0.0]),
+                                    ((np.asarray(p_act3) + np.asarray(p_tgt)) / 2).astype(np.float64),
+                                    mat.astype(np.float64),
+                                    np.array((0.95, 0.85, 0.1, 1.0), dtype=np.float32))
+                scn.ngeom += 1
+            for pos, rad, rgba in ((p_tgt, 0.015, tgt_rgba),
+                                   (p_act3, 0.010, (0.15, 1.0, 0.25, 1.0))):
                 if scn.ngeom < len(scn.geoms):
                     g = scn.geoms[scn.ngeom]
                     mujoco.mjv_initGeom(g, mujoco.mjtGeom.mjGEOM_SPHERE,
