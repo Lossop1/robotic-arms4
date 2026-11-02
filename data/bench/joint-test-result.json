@@ -27,8 +27,15 @@
     "max_speed_0x6080_counts_s": 841045,
     "max_speed_deg_s": 110.0,
     "modes_0x6502": 896,
-    "modes": ["CSP(8)", "CSV(9)", "CST(10)"],
-    "mit_supported": false
+    "modes": [
+      "CSP(8)",
+      "CSV(9)",
+      "CST(10)"
+    ],
+    "mit_supported": false,
+    "torque_nm_datasheet": 100,
+    "torque_scale_status": "unresolved：0x6076 读回 10（CiA402 定义为电机侧额定），厂家输出额定 100；千分比的物理含义待称重标定",
+    "torque_0x6076_expected_motor_side_nm": 5.05
   },
   "friction": {
     "model": "τ = fc·sign(v) + fv·v + b（per-mille 额定）",
@@ -37,28 +44,71 @@
     "bias_permille": -9.6,
     "fit_r2": 0.9945,
     "sweep": [
-      {"v_deg_s": 1.0, "tau_permille": 224.0},
-      {"v_deg_s": -1.0, "tau_permille": -270.0},
-      {"v_deg_s": 2.0, "tau_permille": 275.0},
-      {"v_deg_s": -2.0, "tau_permille": -299.0},
-      {"v_deg_s": 4.0, "tau_permille": 326.0},
-      {"v_deg_s": -4.0, "tau_permille": -336.0},
-      {"v_deg_s": 8.0, "tau_permille": 330.5},
-      {"v_deg_s": -8.0, "tau_permille": -327.0}
+      {
+        "v_deg_s": 1.0,
+        "tau_permille": 224.0
+      },
+      {
+        "v_deg_s": -1.0,
+        "tau_permille": -270.0
+      },
+      {
+        "v_deg_s": 2.0,
+        "tau_permille": 275.0
+      },
+      {
+        "v_deg_s": -2.0,
+        "tau_permille": -299.0
+      },
+      {
+        "v_deg_s": 4.0,
+        "tau_permille": 326.0
+      },
+      {
+        "v_deg_s": -4.0,
+        "tau_permille": -336.0
+      },
+      {
+        "v_deg_s": 8.0,
+        "tau_permille": 330.5
+      },
+      {
+        "v_deg_s": -8.0,
+        "tau_permille": -327.0
+      }
     ],
-    "conditions": "空载、恒速、±15° 行程内、正反双向"
+    "conditions": "空载、恒速、±15° 行程内、正反双向",
+    "unit_note": "以 0x6076 读回值为分母的千分比；绝对 N·m 待定（见 torque_scale_status）"
   },
   "closed_loop": {
-    "bandwidth_hz": [1.2, 1.8],
+    "bandwidth_hz": [
+      1.2,
+      1.8
+    ],
     "bandwidth_method": "正弦扫频至 −3 dB；幅值比 0.5 Hz 1.07 / 1 Hz 1.12 / 2 Hz 0.69",
     "excitation_amplitude_deg": 3.0,
     "note": "±0.5° 激励落在粘滑区（实际摆动比命令大 13%），线性频响不成立，故用 ±3°",
     "frf": [
-      {"f_hz": 0.5, "amp_ratio": 1.067, "phase_lag_deg": 6.5},
-      {"f_hz": 1.0, "amp_ratio": 1.118, "phase_lag_deg": 18.1},
-      {"f_hz": 2.0, "amp_ratio": 0.689, "phase_lag_deg": 153.0}
+      {
+        "f_hz": 0.5,
+        "amp_ratio": 1.067,
+        "phase_lag_deg": 6.5
+      },
+      {
+        "f_hz": 1.0,
+        "amp_ratio": 1.118,
+        "phase_lag_deg": 18.1
+      },
+      {
+        "f_hz": 2.0,
+        "amp_ratio": 0.689,
+        "phase_lag_deg": 153.0
+      }
     ],
-    "unreliable": [4.0, 8.0]
+    "unreliable": [
+      4.0,
+      8.0
+    ]
   },
   "tracking": {
     "err_rms_mdeg": 242.0,
@@ -70,7 +120,14 @@
   },
   "reversal_error_mdeg": 1.0,
   "reversal_note": "位置闭环下的闭环换向偏差；机械齿隙被环路吸收，不作为机械 lost motion 上报",
-  "repeatability_mdeg": {"sigma": [76.0, 22.5], "cycles": 10, "note": "平台段末 0.2 s 均值"},
+  "repeatability_mdeg": {
+    "sigma": [
+      76.0,
+      22.5
+    ],
+    "cycles": 10,
+    "note": "平台段末 0.2 s 均值"
+  },
   "safety_notes": {
     "soft_position_limit_0x607D": "±2e9（等于关闭），必须在发力矩类实验前写窄",
     "torque_mode_incident": "2026-11-02 CST 斜坡试跑时空载加速，无位置/速度限位，已停止 CST 路线"
@@ -81,5 +138,28 @@
     "friction_csv": "data/bench/ident_ramp.csv",
     "frf_csv": "data/bench/obs_sine3.csv",
     "tracking_csv": "data/bench/obs_steps_sine.csv"
+  },
+  "datasheet": {
+    "source": "厂家规格表 LZ12028CH.png（用户提供）",
+    "model": "LZ12028CH",
+    "reducer": "行星 Planetary",
+    "size_mm": "120 x 78",
+    "gear_ratio": 28,
+    "rated_torque_nm": 100,
+    "peak_torque_nm": 360,
+    "rated_speed_rpm": 80,
+    "noload_speed_rpm": 105,
+    "rated_speed_deg_s": 480,
+    "noload_speed_deg_s": 630,
+    "rated_power_w": 1005,
+    "voltage_v": 48,
+    "rated_current_apk": 29.7,
+    "peak_current_apk": 105,
+    "torque_constant_nm_per_a": 0.17,
+    "encoder": "磁编/双编 Dual Encoder",
+    "weight_g": 2270,
+    "brake": "无（CH 款）",
+    "ip": "IP54",
+    "backlash": "未给出"
   }
 }

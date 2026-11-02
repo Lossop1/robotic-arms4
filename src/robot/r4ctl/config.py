@@ -31,7 +31,8 @@ ACTUATOR = dict(
     counts_per_motor_rev=_U["counts_per_motor_rev"],
     counts_per_output_rev=_U["counts_per_output_rev"],
     deg_per_count=_U["deg_per_count"],
-    tau_rated=_R["torque_nm"],                 # 实测 0x6076 = 10 N·m
+    tau_rated=_R["torque_nm_datasheet"],       # 厂家额定 100 N·m（0x6076 读回 10，冲突待标定）
+    torque_scale_unresolved=True,
     tau_unit="per-mille of rated",
     tau_max_permille=_R["max_torque_0x6072_permille"],
     v_out_max_deg_s=_R["max_speed_deg_s"],     # 实测 0x6080
