@@ -35,6 +35,7 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src" / "robot"))
 from r4ctl.ik import fk, ik, singular_margin  # noqa: E402
+from r4ctl.model import Chain  # noqa: E402
 
 MJCF = ROOT / "data" / "models" / "r4_urdf" / "urdf" / "r4_mjcf.xml"
 
@@ -74,7 +75,9 @@ class Ctl:
         self.ok = True
         self.err_mm = float("nan")
         self.rate = 0.04          # 按住键盘时的移动速度 m/s
-        self.kp_wanted = None     # 若设置，热更新执行器刚度
+        self.kp_wanted = None
+        self.law = "pdg"          # p | pd | pdg | pdgf | ctc
+        self.qd_last = np.zeros(4)
 
     def set_p(self, p):
         with self.lock:
@@ -122,6 +125,11 @@ def apply_command(ctl, line, q_now):
             if cmd == "home":
                 ctl.p = np.asarray(tcp_of(q_now)).copy()
                 return f"目标 = {np.round(ctl.p*1000,1)} mm（当前末端）"
+            if cmd == "law" and len(parts) == 2:
+                if parts[1].lower() in ("p", "pd", "pdg", "pdgf", "ctc"):
+                    ctl.law = parts[1].lower()
+                    return f"控制律 -> {ctl.law}"
+                return "可选：p pd pdg pdgf ctc"
             if cmd == "kp" and len(parts) == 2:
                 return f"__KP__{float(parts[1])}"
             if cmd == "speed" and len(parts) == 2:
@@ -177,6 +185,19 @@ def main():
     model = mujoco.MjModel.from_xml_path(args.mjcf)
     data = mujoco.MjData(model)
     nq = min(model.nq, 4)
+    # 执行器改成力矩模式：gain=1、bias=0，ctrl 直接是 N·m
+    TAU_MAX = 100.0
+    FC, FV = 2.6, 0.104
+    for i in range(model.nu):
+        model.actuator_gainprm[i, :] = 0.0
+        model.actuator_gainprm[i, 0] = 1.0
+        model.actuator_biasprm[i, :] = 0.0
+        model.actuator_ctrlrange[i] = (-TAU_MAX, TAU_MAX)
+        model.dof_frictionloss[i] = FC
+    chain = Chain()
+    w = 2 * math.pi * 8.0
+    kp_vec = np.asarray(chain.effective_inertia(), dtype=float) * w ** 2
+    kd_vec = 2.0 * np.asarray(chain.effective_inertia(), dtype=float) * w
 
     p_now = tcp_of(np.zeros(4))
     # 默认目标：末端下方 6 cm —— 开局就看得见，且离机械臂有间距
@@ -192,8 +213,29 @@ def main():
                 ctl.ok = True
             else:
                 ctl.ok = False
-        for i in range(model.nu):
-            data.ctrl[i] = ctl.q[i]
+        # 用选定的控制律算力矩
+        q = np.array([data.qpos[i] for i in range(4)])
+        qd = np.array([data.qvel[i] for i in range(4)])
+        q_d = ctl.q.copy()
+        qd_d = (q_d - ctl.qd_last) / model.opt.timestep
+        ctl.qd_last = q_d.copy()
+        e = q_d - q
+        ed = qd_d - qd
+        law = ctl.law
+        if law == "p":
+            tau = kp_vec * e
+        elif law == "pd":
+            tau = kp_vec * e + kd_vec * ed
+        elif law == "pdg":
+            tau = kp_vec * e + kd_vec * ed + np.asarray(chain.gravity(q_d), dtype=float)
+        elif law == "pdgf":
+            v = qd_d.copy(); v[np.abs(v) < 0.02] = 0.0
+            tau = (kp_vec * e + kd_vec * ed + np.asarray(chain.gravity(q_d), dtype=float)
+                   + FC * np.sign(v) + FV * np.degrees(v))
+        else:
+            Mq = np.asarray(chain.mass_matrix(q_d), dtype=float)
+            tau = Mq @ (w ** 2 * e + 2 * w * ed) + np.asarray(chain.bias(q_d, qd_d), dtype=float)
+        data.ctrl[:4] = np.clip(tau, -TAU_MAX, TAU_MAX)
         mujoco.mj_step(model, data)
         q_act = np.array([data.qpos[i] for i in range(nq)])
         with ctl.lock:
@@ -208,9 +250,10 @@ def main():
         flag = "OK " if ok else "IK失败(保留上次解)"
         with ctl.lock:
             spd = ctl.rate * 1000
+            law = ctl.law
         return (f"目标({p_tgt[0]*1000:+.0f},{p_tgt[1]*1000:+.0f},{p_tgt[2]*1000:+.0f}) "
                 f"实际({p_act[0]*1000:+.0f},{p_act[1]*1000:+.0f},{p_act[2]*1000:+.0f}) "
-                f"误差{err:5.1f}mm 奇异{singular_margin(qd):.2f} 速度{spd:3.0f}mm/s {flag} {js}")
+                f"误差{err:5.1f}mm 奇异{singular_margin(qd):.2f} 速度{spd:3.0f}mm/s 律{law} {flag} {js}")
 
     if args.selftest:
         base = ctl.p.copy()
