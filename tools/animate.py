@@ -15,7 +15,7 @@ import vtk
 from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
-URDF_DIR = ROOT.parent / "urdf" / "r4_urdf"
+URDF_DIR = ROOT / "data" / "models" / "r4_urdf"
 sys.path.insert(0, str(ROOT))
 
 from r4ctl.model import chain  # noqa: E402

@@ -2,8 +2,9 @@
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
-URDF = Path(r"D:\taili\robotic-arm\urdf\r4_urdf")
-PKG = Path(r"D:\taili\robotic-arm\R4_Integrated_20261029\R4_Integrated_20261029")
+_ROOT = Path(__file__).resolve().parents[1]
+URDF = _ROOT / "data" / "models" / "r4_urdf"
+PKG = _ROOT / "data" / "cad" / "R4_Integrated_20261029"
 
 TILES = [
     (PKG / "preview" / "complete.png", "CAD assembly (SolidWorks preview)"),

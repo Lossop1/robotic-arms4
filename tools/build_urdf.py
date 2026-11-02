@@ -25,8 +25,9 @@ from pathlib import Path
 
 import numpy as np
 
-PKG = Path(r"D:\taili\robotic-arm\R4_Integrated_20261029\R4_Integrated_20261029")
-OUT = Path(r"D:\taili\robotic-arm\urdf\r4_urdf")
+_ROOT = Path(__file__).resolve().parents[1]
+PKG = _ROOT / "data" / "cad" / "R4_Integrated_20261029"
+OUT = _ROOT / "data" / "models" / "r4_urdf"
 
 # ---------------------------------------------------------------- 密度假设 kg/m^3
 DENSITY = {

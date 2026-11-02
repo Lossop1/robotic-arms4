@@ -9,7 +9,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 
-OUT = Path(__file__).resolve().parents[1] / "out"
+OUT = Path(__file__).resolve().parents[3] / "out"
 OUT.mkdir(exist_ok=True)
 
 plt.rcParams["font.sans-serif"] = ["Microsoft YaHei", "SimHei", "DejaVu Sans"]

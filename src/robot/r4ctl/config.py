@@ -16,8 +16,8 @@ from __future__ import annotations
 import math
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[2]
-URDF = ROOT / "urdf" / "r4_urdf" / "urdf" / "r4.urdf"
+ROOT = next(p for p in Path(__file__).resolve().parents if (p / ".git").exists())
+URDF = ROOT / "data" / "models" / "r4_urdf" / "urdf" / "r4.urdf"
 
 # ===================================================================== 执行器
 ACTUATOR = dict(

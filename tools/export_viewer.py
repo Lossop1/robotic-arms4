@@ -19,8 +19,8 @@ import numpy as np
 import trimesh
 
 ROOT = Path(__file__).resolve().parents[1]
-URDF_DIR = ROOT.parent / "urdf" / "r4_urdf"
-OUT = ROOT / "viewer"
+URDF_DIR = ROOT / "data" / "models" / "r4_urdf"
+OUT = ROOT / "tools" / "viewer"
 sys.path.insert(0, str(ROOT))
 
 from r4ctl import ik as IK  # noqa: E402

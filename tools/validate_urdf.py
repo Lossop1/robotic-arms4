@@ -19,8 +19,9 @@ from pathlib import Path
 import numpy as np
 from lxml import etree
 
-URDF_DIR = Path(r"D:\taili\robotic-arm\urdf\r4_urdf")
-PKG = Path(r"D:\taili\robotic-arm\R4_Integrated_20261029\R4_Integrated_20261029")
+_ROOT = Path(__file__).resolve().parents[1]
+URDF_DIR = _ROOT / "data" / "models" / "r4_urdf"
+PKG = _ROOT / "data" / "cad" / "R4_Integrated_20261029"
 OUT = URDF_DIR / "preview"
 
 

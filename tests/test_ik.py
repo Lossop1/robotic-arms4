@@ -10,7 +10,7 @@ from pathlib import Path
 
 import numpy as np
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src" / "robot"))
 from r4ctl import ik as IK  # noqa: E402
 from r4ctl.model import chain  # noqa: E402
 

@@ -4,5 +4,5 @@ __pycache__/
 .pytest_cache/
 .venv/
 *.zip
-control/out/
-control/viewer/data.js
+out/
+tools/viewer/data.js
