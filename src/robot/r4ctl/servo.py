@@ -22,7 +22,7 @@ import numpy as np
 from . import config as C
 from .model import chain
 
-TAU_MAX = C.SAFETY["tau_margin"] * C.ACTUATOR["tau_cont"]
+TAU_MAX = C.SAFETY["tau_margin"] * C.ACTUATOR["tau_rated"]
 
 
 class Servo:
@@ -31,7 +31,7 @@ class Servo:
         self.mode = mode
         self.M_eff = self.ch.effective_inertia()
         if kp is None or kd is None:
-            wn = np.array([2 * math.pi * j["wn_hz"] for j in C.JOINTS[: self.ch.n]])
+            wn = np.full(self.ch.n, 2 * math.pi * C.CTL["wn_design_hz"])
             zeta = np.array([j["zeta"] for j in C.JOINTS[: self.ch.n]])
             self.kp = self.M_eff * wn ** 2
             self.kd = 2.0 * zeta * self.M_eff * wn
@@ -41,8 +41,8 @@ class Servo:
         self.kp *= kp_scale
         self.kd *= kd_scale
         self.ch = chain()
-        self.fc = np.array([f["fc"] for f in C.FRICTION[: self.ch.n]])
-        self.fv = np.array([f["fv"] for f in C.FRICTION[: self.ch.n]])
+        self.fc = np.full(self.ch.n, C.FRICTION_MODEL["fc"])
+        self.fv = np.full(self.ch.n, C.FRICTION_MODEL["fv"])
         self.sat_count = 0
 
     # ----------------------------------------------------------------- 摩擦前馈

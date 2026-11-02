@@ -71,6 +71,22 @@ python tools/opssh.py --file <脚本>
 | `tools/opssh.py <命令>` | 远程执行 | 同上 |
 | `tools/esi_dump.py <ESI>` | 解析 ESI 的 PDO 映射 | 同上 |
 
+## 实测结果 → 配置
+
+唯一数据源是 data/bench/joint-test-result.json（单关节实测，2026-11-02），
+src/robot/r4ctl/config.py 从它派生，不硬编码执行器参数：
+
+| 派生量 | 来源字段 | 当前值 |
+|---|---|---|
+| 额定力矩 | 
+ated.torque_nm（0x6076 实测） | 10.0 N·m |
+| 减速比 / 分辨率 | units.gear_ratio、counts_per_motor_rev | 28:1、0.000785°/count |
+| 库仑摩擦 fc | riction.fc_permille | 2.595 N·m = 26% 额定 |
+| 粘滞摩擦 fv | riction.fv_permille_per_deg_s | 0.104 N·m/(°/s) |
+| 闭环带宽 | closed_loop.bandwidth_hz | 1.2–1.8 Hz |
+| 设计 f_n | 带宽 ÷ 0.64 ÷ 2（相位裕度） | 1.17 Hz |
+| Kp / Kd | M_eff × ω²、2ζ M_eff ω | J1 89.5 / 24.3；J3 21.1 / 5.7 |
+
 ## 未决问题
 
 1. **额定转矩 10 N·m 与 LZ12028 标称 80 N·m 差 8 倍**：需用 CST 下发已知 per-mille 并读回标定。

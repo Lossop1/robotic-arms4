@@ -1,0 +1,85 @@
+{
+  "schema": "joint-test-result/1",
+  "model": "CyberBeast ISVD90RC-300B-100-70（良质 LZ12028）",
+  "tested_at": "2026-11-02",
+  "test_rig": "orangepi6plus + enp49s0，单关节台架，SOEM 主站 1 ms DC，设点口 200 Hz + 观测口 1 kHz",
+  "identity": {
+    "vendor_id": "0x000C0B00",
+    "product_code": "0x00080117",
+    "revision": 1,
+    "serial_0x1018_04": 0
+  },
+  "units": {
+    "position": "counts，输出轴",
+    "counts_per_motor_rev": 16384,
+    "gear_ratio": 28.0,
+    "counts_per_output_rev": 458752,
+    "deg_per_count": 0.000785,
+    "velocity": "counts/s，输出轴",
+    "torque": "per-mille（千分之一）额定",
+    "torque_source": "0x6071/0x6077 的 INT16，÷1000×0x6076"
+  },
+  "rated": {
+    "torque_0x6076_raw": 10000,
+    "torque_0x6076_unit": "0.001 N·m",
+    "torque_nm": 10.0,
+    "max_torque_0x6072_permille": 1000,
+    "max_speed_0x6080_counts_s": 841045,
+    "max_speed_deg_s": 110.0,
+    "modes_0x6502": 896,
+    "modes": ["CSP(8)", "CSV(9)", "CST(10)"],
+    "mit_supported": false
+  },
+  "friction": {
+    "model": "τ = fc·sign(v) + fv·v + b（per-mille 额定）",
+    "fc_permille": 259.5,
+    "fv_permille_per_deg_s": 10.38,
+    "bias_permille": -9.6,
+    "fit_r2": 0.9945,
+    "sweep": [
+      {"v_deg_s": 1.0, "tau_permille": 224.0},
+      {"v_deg_s": -1.0, "tau_permille": -270.0},
+      {"v_deg_s": 2.0, "tau_permille": 275.0},
+      {"v_deg_s": -2.0, "tau_permille": -299.0},
+      {"v_deg_s": 4.0, "tau_permille": 326.0},
+      {"v_deg_s": -4.0, "tau_permille": -336.0},
+      {"v_deg_s": 8.0, "tau_permille": 330.5},
+      {"v_deg_s": -8.0, "tau_permille": -327.0}
+    ],
+    "conditions": "空载、恒速、±15° 行程内、正反双向"
+  },
+  "closed_loop": {
+    "bandwidth_hz": [1.2, 1.8],
+    "bandwidth_method": "正弦扫频至 −3 dB；幅值比 0.5 Hz 1.07 / 1 Hz 1.12 / 2 Hz 0.69",
+    "excitation_amplitude_deg": 3.0,
+    "note": "±0.5° 激励落在粘滑区（实际摆动比命令大 13%），线性频响不成立，故用 ±3°",
+    "frf": [
+      {"f_hz": 0.5, "amp_ratio": 1.067, "phase_lag_deg": 6.5},
+      {"f_hz": 1.0, "amp_ratio": 1.118, "phase_lag_deg": 18.1},
+      {"f_hz": 2.0, "amp_ratio": 0.689, "phase_lag_deg": 153.0}
+    ],
+    "unreliable": [4.0, 8.0]
+  },
+  "tracking": {
+    "err_rms_mdeg": 242.0,
+    "err_p95_mdeg": 496.0,
+    "err_max_mdeg": 1764.0,
+    "sample_hz": 1000,
+    "source": "观测帧 actual_position vs target_position 同帧比较",
+    "conditions": "±10° S 曲线、≤8 °/s、空载"
+  },
+  "reversal_error_mdeg": 1.0,
+  "reversal_note": "位置闭环下的闭环换向偏差；机械齿隙被环路吸收，不作为机械 lost motion 上报",
+  "repeatability_mdeg": {"sigma": [76.0, 22.5], "cycles": 10, "note": "平台段末 0.2 s 均值"},
+  "safety_notes": {
+    "soft_position_limit_0x607D": "±2e9（等于关闭），必须在发力矩类实验前写窄",
+    "torque_mode_incident": "2026-11-02 CST 斜坡试跑时空载加速，无位置/速度限位，已停止 CST 路线"
+  },
+  "sources": {
+    "sdo": "sdo_read 0x6076/0x6075/0x6072/0x6080/0x6502/0x608F/0x6091",
+    "scan": "emaster-scan enp49s0",
+    "friction_csv": "data/bench/ident_ramp.csv",
+    "frf_csv": "data/bench/obs_sine3.csv",
+    "tracking_csv": "data/bench/obs_steps_sine.csv"
+  }
+}

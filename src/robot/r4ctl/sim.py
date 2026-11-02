@@ -29,8 +29,8 @@ class Sim:
         self.friction = friction
         self.quantize = quantize
         self.alpha = vel_filter_alpha
-        self.fc = np.array([f["fc"] for f in C.FRICTION[: self.ch.n]])
-        self.fv = np.array([f["fv"] for f in C.FRICTION[: self.ch.n]])
+        self.fc = np.full(self.ch.n, C.FRICTION_MODEL["fc"])
+        self.fv = np.full(self.ch.n, C.FRICTION_MODEL["fv"])
 
     # ----------------------------------------------------------------- 摩擦
     def _friction_torque(self, qd):

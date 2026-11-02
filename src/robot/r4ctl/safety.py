@@ -12,7 +12,7 @@ import numpy as np
 from . import config as C
 from .model import chain
 
-TAU_MAX = C.SAFETY["tau_margin"] * C.ACTUATOR["tau_cont"]
+TAU_MAX = C.SAFETY["tau_margin"] * C.ACTUATOR["tau_rated"]
 
 
 class Safety:
