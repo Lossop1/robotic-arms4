@@ -20,6 +20,12 @@ import numpy as np
 from lxml import etree
 
 _ROOT = Path(__file__).resolve().parents[1]
+VERSION = "0.1.0"
+
+if "--version" in sys.argv[1:]:
+    print(f"{Path(__file__).name} {VERSION}")
+    raise SystemExit(0)
+
 URDF_DIR = _ROOT / "data" / "models" / "r4_urdf"
 PKG = _ROOT / "data" / "cad" / "R4_Integrated_20261029"
 OUT = URDF_DIR / "preview"

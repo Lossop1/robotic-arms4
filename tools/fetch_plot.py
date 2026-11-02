@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """把台架采集的 CSV 拉回本地并画图。
 
 用法: python bench/fetch_plot.py <远端路径> <本地名字>
@@ -21,6 +21,12 @@ plt.rcParams["font.sans-serif"] = ["Microsoft YaHei", "SimHei"]
 plt.rcParams["axes.unicode_minus"] = False
 plt.rcParams["axes.grid"] = True
 plt.rcParams["grid.alpha"] = 0.3
+
+VERSION = "0.1.0"
+
+if "--version" in sys.argv[1:]:
+    print(f"{Path(__file__).name} {VERSION}")
+    raise SystemExit(0)
 
 DATA = Path(__file__).resolve().parent / "data"
 DATA.mkdir(exist_ok=True)
@@ -56,6 +62,9 @@ def load(path: Path):
 
 
 def main():
+    if len(sys.argv) < 3:
+        print("用法: fetch_plot.py \u003c远端路径\u003e \u003c本地名字\u003e", file=sys.stderr)
+        return 2
     remote, name = sys.argv[1], sys.argv[2]
     p = fetch(remote, name)
     d = load(p)
@@ -93,4 +102,4 @@ def main():
 if __name__ == "__main__":
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
-    main()
+    sys.exit(main())

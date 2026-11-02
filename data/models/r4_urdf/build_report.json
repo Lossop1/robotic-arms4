@@ -1,5 +1,5 @@
 {
-  "generated": "2026-11-02 12:13:11",
+  "generated": "2026-11-02 12:19:38",
   "source": "D:\\taili\\robotic-arm\\data\\cad\\R4_Integrated_20261029",
   "instances": 201,
   "links": {
@@ -166,5 +166,5 @@
     "collision": "每个连杆取视觉网格的凸包（近似）"
   },
   "total_mass_kg": 19.3361,
-  "elapsed_s": 20.9
+  "elapsed_s": 15.4
 }

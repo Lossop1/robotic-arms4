@@ -19,6 +19,11 @@ import numpy as np
 import trimesh
 
 ROOT = Path(__file__).resolve().parents[1]
+VERSION = "0.1.0"
+if "--version" in sys.argv[1:]:
+    print(f"{Path(__file__).name} {VERSION}")
+    raise SystemExit(0)
+
 URDF_DIR = ROOT / "data" / "models" / "r4_urdf"
 OUT = ROOT / "tools" / "viewer"
 sys.path.insert(0, str(ROOT))

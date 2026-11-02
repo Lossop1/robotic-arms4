@@ -70,7 +70,7 @@ GROUP_TO_LINK = {0: "base_link", 1: "link1", 2: "link2", 3: "link3", 4: "link4"}
 
 
 def log(msg: str) -> None:
-    print(msg, flush=True)
+    print(msg, file=sys.stderr, flush=True)
 
 
 # ============================================================ 工具函数
@@ -416,4 +416,5 @@ def build(args):
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--quick", action="store_true", help="粗网格试跑")
+    ap.add_argument("--version", action="version", version="build_urdf 0.1.0")
     build(ap.parse_args())

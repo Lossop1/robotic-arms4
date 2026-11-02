@@ -1,8 +1,15 @@
 """把 URDF 渲染图与原始 SolidWorks 预览拼成对照图，并汇总交付物统计。"""
+import sys
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 _ROOT = Path(__file__).resolve().parents[1]
+VERSION = "0.1.0"
+
+if "--version" in sys.argv[1:]:
+    print(f"{Path(__file__).name} {VERSION}")
+    raise SystemExit(0)
+
 URDF = _ROOT / "data" / "models" / "r4_urdf"
 PKG = _ROOT / "data" / "cad" / "R4_Integrated_20261029"
 

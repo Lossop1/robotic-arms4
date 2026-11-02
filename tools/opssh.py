@@ -46,6 +46,15 @@ def run(client, cmd, timeout=25):
 
 def main():
     args = sys.argv[1:]
+    if args and args[0] in ("--version", "-V"):
+        print(f"opssh.py 0.1.0")
+        return 0
+    if args and args[0] in ("--help", "-h"):
+        print("用法: opssh.py [--file <本地脚本> | <远端命令> ...]\n"
+              "  --version  打印版本后退出\n"
+              "  --file X   把本地脚本整段喂给远端 bash -s\n"
+              "  不给参数   打印本说明")
+        return 0
     if args and args[0] == "--file":
         # 把本地脚本整段喂给远端 bash -s，彻底绕开引号转义
         script = open(args[1], encoding="utf-8").read()
