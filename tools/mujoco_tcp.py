@@ -39,6 +39,26 @@ from r4ctl.ik import fk, ik, singular_margin  # noqa: E402
 MJCF = ROOT / "data" / "models" / "r4_urdf" / "urdf" / "r4_mjcf.xml"
 
 
+def add_capsule(mujoco, scn, p0, p1, radius, rgba):
+    """在 user_scn 里加一条胶囊（用于坐标轴和误差连线）。"""
+    p0 = np.asarray(p0, dtype=float); p1 = np.asarray(p1, dtype=float)
+    d = p1 - p0
+    L = float(np.linalg.norm(d))
+    if L < 1e-6 or scn.ngeom >= len(scn.geoms):
+        return
+    z = d / L
+    tmp = np.array([1.0, 0, 0]) if abs(z[0]) < 0.9 else np.array([0, 1.0, 0])
+    x = np.cross(tmp, z); x /= np.linalg.norm(x)
+    y = np.cross(z, x)
+    g = scn.geoms[scn.ngeom]
+    mujoco.mjv_initGeom(g, mujoco.mjtGeom.mjGEOM_CAPSULE,
+                        np.array([radius, L / 2, 0.0]),
+                        ((p0 + p1) / 2).astype(np.float64),
+                        np.column_stack([x, y, z]).ravel().astype(np.float64),
+                        np.array(rgba, dtype=np.float32))
+    scn.ngeom += 1
+
+
 def tcp_of(q):
     return np.asarray(fk(np.asarray(q, dtype=float)), dtype=float).reshape(-1)[:3]
 
@@ -53,6 +73,7 @@ class Ctl:
         self.q = np.zeros(4)
         self.ok = True
         self.err_mm = float("nan")
+        self.rate = 0.04          # 按住键盘时的移动速度 m/s
 
     def set_p(self, p):
         with self.lock:
@@ -100,6 +121,10 @@ def apply_command(ctl, line, q_now):
             if cmd == "home":
                 ctl.p = np.asarray(tcp_of(q_now)).copy()
                 return f"目标 = {np.round(ctl.p*1000,1)} mm（当前末端）"
+            if cmd == "speed" and len(parts) == 2:
+                return f"__SPEED__{float(parts[1])}"
+            if cmd == "frame":
+                return "基座坐标系：原点在基座底面，X 指臂伸出方向，Y 左，Z 上"
             if cmd == "status":
                 return "__STATUS__"
             if cmd in ("quit", "exit"):
@@ -114,6 +139,15 @@ def stdin_thread(ctl, stop_evt):
         if stop_evt.is_set():
             return
         msg = apply_command(ctl, line, ctl.q)
+        if msg.startswith("__SPEED__"):
+            try:
+                spd = float(msg.replace("__SPEED__", ""))
+                with ctl.lock:
+                    ctl.rate = spd / 1000.0
+                print(f"\n[命令] 速度 -> {spd:.0f} mm/s", flush=True)
+            except ValueError:
+                print("\n速度值不对", flush=True)
+            continue
         if msg == "__QUIT__":
             stop_evt.set()
             return
@@ -160,20 +194,22 @@ def main():
         p_act = tcp_of(q_act)
         js = " ".join(f"J{i+1}={math.degrees(qd[i]):+6.1f}" for i in range(4))
         flag = "OK " if ok else "IK失败(保留上次解)"
+        with ctl.lock:
+            spd = ctl.rate * 1000
         return (f"目标({p_tgt[0]*1000:+.0f},{p_tgt[1]*1000:+.0f},{p_tgt[2]*1000:+.0f}) "
                 f"实际({p_act[0]*1000:+.0f},{p_act[1]*1000:+.0f},{p_act[2]*1000:+.0f}) "
-                f"误差{err:5.1f}mm 奇异{singular_margin(qd):.2f} {flag} {js}")
+                f"误差{err:5.1f}mm 奇异{singular_margin(qd):.2f} 速度{spd:3.0f}mm/s {flag} {js}")
 
     if args.selftest:
         base = ctl.p.copy()
         print(f"起点目标 {np.round(base*1000,1)} mm")
         for dx in (0, 20, 40, 60):
             ctl.set_p(base + np.array([dx / 1000.0, 0, 0]))
-            for _ in range(200):
+            for _ in range(1200):          # 1.2 s，让伺服收敛到稳态
                 q_act = solve_and_step()
             print(f"  X+{dx:3d}mm -> {status_line(q_act)}")
         ctl.set_p(base + np.array([0, 0, -0.25]))
-        for _ in range(200):
+        for _ in range(1200):
             q_act = solve_and_step()
         print(f"  超范围   -> {status_line(q_act)}")
         return 0
@@ -200,37 +236,30 @@ def main():
             fwd = np.array([-math.sin(az), math.cos(az), 0.0])
             right = np.array([math.cos(az), math.sin(az), 0.0])
             with ctl.lock:
-                if keys.down("w"): ctl.p += fwd * rate * dt
-                if keys.down("s"): ctl.p -= fwd * rate * dt
-                if keys.down("a"): ctl.p -= right * rate * dt
-                if keys.down("d"): ctl.p += right * rate * dt
-                if keys.down("q"): ctl.p[2] -= rate * dt
-                if keys.down("e"): ctl.p[2] += rate * dt
+                if keys.down("w"): ctl.p += fwd * ctl.rate * dt
+                if keys.down("s"): ctl.p -= fwd * ctl.rate * dt
+                if keys.down("a"): ctl.p -= right * ctl.rate * dt
+                if keys.down("d"): ctl.p += right * ctl.rate * dt
+                if keys.down("q"): ctl.p[2] -= ctl.rate * dt
+                if keys.down("e"): ctl.p[2] += ctl.rate * dt
 
             q_act = solve_and_step()
 
             scn = viewer.user_scn
             scn.ngeom = 0
+            # 基座坐标系：X 红 / Y 绿 / Z 蓝，各 120 mm
+            for ax, col in ((np.array([1.0,0,0]), (1.0,0.2,0.2,1.0)),
+                            (np.array([0,1.0,0]), (0.2,1.0,0.2,1.0)),
+                            (np.array([0,0,1.0]), (0.3,0.5,1.0,1.0))):
+                add_capsule(mujoco, scn, np.zeros(3), ax*0.12, 0.004, col)
+            with ctl.lock:
+                _spd = rate
             with ctl.lock:
                 p_tgt = ctl.p.copy()
             p_act3 = tcp_of(q_act)
             tgt_rgba = (1.0, 0.15, 0.15, 1.0) if ctl.ok else (1.0, 0.6, 0.0, 1.0)
-            # 连杆：从实际末端指向目标，长度 = 当前误差
-            d = np.asarray(p_tgt) - np.asarray(p_act3)
-            L = float(np.linalg.norm(d))
-            if L > 1e-4 and scn.ngeom < len(scn.geoms):
-                z = d / L
-                tmp = np.array([1.0, 0, 0]) if abs(z[0]) < 0.9 else np.array([0, 1.0, 0])
-                x = np.cross(tmp, z); x /= np.linalg.norm(x)
-                y = np.cross(z, x)
-                mat = np.column_stack([x, y, z]).ravel()
-                g = scn.geoms[scn.ngeom]
-                mujoco.mjv_initGeom(g, mujoco.mjtGeom.mjGEOM_CAPSULE,
-                                    np.array([0.004, L / 2, 0.0]),
-                                    ((np.asarray(p_act3) + np.asarray(p_tgt)) / 2).astype(np.float64),
-                                    mat.astype(np.float64),
-                                    np.array((0.95, 0.85, 0.1, 1.0), dtype=np.float32))
-                scn.ngeom += 1
+            # 误差连线：实际末端 -> 目标
+            add_capsule(mujoco, scn, p_act3, p_tgt, 0.004, (0.95, 0.85, 0.1, 1.0))
             for pos, rad, rgba in ((p_tgt, 0.015, tgt_rgba),
                                    (p_act3, 0.010, (0.15, 1.0, 0.25, 1.0))):
                 if scn.ngeom < len(scn.geoms):
