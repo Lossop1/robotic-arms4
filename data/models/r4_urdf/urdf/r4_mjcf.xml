@@ -1,0 +1,48 @@
+<mujoco model="r4">
+  <compiler angle="radian" autolimits="true"/>
+  <option gravity="0 0 -9.81" timestep="0.001" integrator="implicitfast"/>
+  <visual><global offwidth="1280" offheight="800"/></visual>
+  <asset>
+    <mesh name="m_base_link" file="D:/taili/robotic-arm/data/models/r4_urdf/meshes/visual/base_link.stl"/>
+    <mesh name="m_link1" file="D:/taili/robotic-arm/data/models/r4_urdf/meshes/visual/link1.stl"/>
+    <mesh name="m_link2" file="D:/taili/robotic-arm/data/models/r4_urdf/meshes/visual/link2.stl"/>
+    <mesh name="m_link3" file="D:/taili/robotic-arm/data/models/r4_urdf/meshes/visual/link3.stl"/>
+    <mesh name="m_link4" file="D:/taili/robotic-arm/data/models/r4_urdf/meshes/visual/link4.stl"/>
+  </asset>
+  <worldbody>
+    <light pos="1 1 2" dir="-0.4 -0.4 -1" diffuse="0.7 0.7 0.7"/>
+    <geom name="floor" type="plane" size="3 3 0.05" pos="0 0 -0.001" rgba=".88 .88 .9 1"/>
+    <body name="base_link">
+      <inertial pos="-0.000016 0.000006 0.058492" mass="5.106176" fullinertia="0.049584 0.049590 0.032266 0.000002 0.000005 -0.000000"/>
+      <geom type="mesh" mesh="m_base_link" contype="0" conaffinity="0" rgba="0.72 0.75 0.8 1"/>
+      <body name="link1" pos="0.000000 0.000000 0.110000" quat="0.000000 0.000000 0.000000 1.000000">
+        <joint name="joint1" type="hinge" axis="0.000000 0.000000 1.000000"/>
+        <inertial pos="-0.000018 -0.018139 0.114641" mass="4.577126" fullinertia="0.103180 0.104240 0.016946 -0.000006 0.000015 0.016332"/>
+        <geom type="mesh" mesh="m_link1" contype="0" conaffinity="0" rgba="0.72 0.75 0.8 1"/>
+        <body name="link2" pos="0.000000 0.000000 0.160000" quat="0.000000 0.000000 0.000000 1.000000">
+          <joint name="joint2" type="hinge" axis="0.000000 1.000000 0.000000"/>
+          <inertial pos="0.000045 0.015125 0.184581" mass="4.111898" fullinertia="0.240848 0.241151 0.009318 -0.000007 -0.000037 -0.001937"/>
+          <geom type="mesh" mesh="m_link2" contype="0" conaffinity="0" rgba="0.72 0.75 0.8 1"/>
+          <body name="link3" pos="0.000000 0.036000 0.260000" quat="0.000000 0.000000 0.000000 1.000000">
+            <joint name="joint3" type="hinge" axis="0.000000 1.000000 0.000000"/>
+            <inertial pos="0.161511 -0.010854 0.000007" mass="4.701789" fullinertia="0.022834 0.203140 0.210391 0.028316 -0.000006 0.000004"/>
+            <geom type="mesh" mesh="m_link3" contype="0" conaffinity="0" rgba="0.72 0.75 0.8 1"/>
+            <body name="link4" pos="0.240000 -0.036000 0.000000" quat="0.000000 0.000000 0.000000 1.000000">
+              <joint name="joint4" type="hinge" axis="1.000000 0.000000 0.000000"/>
+              <inertial pos="0.029941 0.000000 0.000000" mass="0.839127" fullinertia="0.001035 0.001943 0.001942 0.000000 0.000000 0.000000"/>
+              <geom type="mesh" mesh="m_link4" contype="0" conaffinity="0" rgba="0.72 0.75 0.8 1"/>
+              <body name="tool_link" pos="0.064000 0.000000 0.000000" quat="0.000000 0.000000 0.000000 1.000000">
+              </body>
+            </body>
+          </body>
+        </body>
+      </body>
+    </body>
+  </worldbody>
+  <actuator>
+    <position name="act_joint1" joint="joint1" kp="800.0" kv="20.0" ctrlrange="-3.15 3.15"/>
+    <position name="act_joint2" joint="joint2" kp="800.0" kv="20.0" ctrlrange="-3.15 3.15"/>
+    <position name="act_joint3" joint="joint3" kp="800.0" kv="20.0" ctrlrange="-3.15 3.15"/>
+    <position name="act_joint4" joint="joint4" kp="800.0" kv="20.0" ctrlrange="-3.15 3.15"/>
+  </actuator>
+</mujoco>

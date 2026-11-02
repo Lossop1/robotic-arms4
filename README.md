@@ -100,6 +100,17 @@ config.py 里的 q_min/q_max 是**软件限位**（防绕线/自碰），不是�
 执行器参数以厂家规格表为准：行星 28:1、额定 100 N·m、峰值 360 N·m、
 额定 80 rpm（输出 480 °/s）、双编码器、无刹车、重 2.27 kg。
 
+## 可视化仿真（MuJoCo）
+
+`ash
+python tools/make_mjcf.py          # URDF -> MJCF（含 CSP 位置执行器）
+python tools/mujoco_view.py        # 打开窗口，用键盘自己控制
+`
+
+按键：1–4 选关节，A/D 转 ±5°，W/S 微调，R 回零，G 重力开关，Q 退出。
+每个关节是一个 position 执行器（kp/kv），对应真机的 CSP 位置环；
+--headless 只跑物理不开窗口，用于自检。
+
 ## 未决问题
 
 1. **额定转矩 10 N·m 与 LZ12028 标称 80 N·m 差 8 倍**：需用 CST 下发已知 per-mille 并读回标定。
